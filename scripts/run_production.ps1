@@ -92,4 +92,5 @@ if ($Stage -in @("falsification", "all")) {
 if ($Stage -in @("controller", "all")) {
     Invoke-Stage "39_build_controller_exposure_schedule.py" @()
     Invoke-Stage "40_validate_benchmark_replication.py" @()
+    Invoke-Stage "41_run_stock_level_controller.py" @()
 }

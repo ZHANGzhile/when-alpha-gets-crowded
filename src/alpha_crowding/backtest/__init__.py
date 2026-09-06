@@ -16,19 +16,29 @@ from .controller import (
     probability_to_active_weight,
     risk_percentile_to_active_weight,
 )
+from .execution import (
+    MissingExecutionDataError,
+    build_controller_stock_targets,
+    simulate_stock_level_controller,
+    validate_execution_constraints,
+)
 from .metrics import (
+    AbsolutePerformance,
     RelativePerformance,
     active_cvar,
     arithmetic_active_returns,
+    evaluate_absolute_performance,
     evaluate_relative_performance,
     information_ratio,
     max_drawdown,
     relative_nav,
+    summarize_controller_performance,
     tracking_error,
 )
 
 __all__ = [
     "DEFAULT_RISK_BANDS",
+    "AbsolutePerformance",
     "RebalanceResult",
     "RelativePerformance",
     "active_cvar",
@@ -38,6 +48,7 @@ __all__ = [
     "calculate_rebalance",
     "combine_stock_target_weights",
     "drift_weights",
+    "evaluate_absolute_performance",
     "evaluate_relative_performance",
     "historical_risk_percentile",
     "information_ratio",
@@ -46,6 +57,11 @@ __all__ = [
     "rebalance_after_drift",
     "relative_nav",
     "risk_percentile_to_active_weight",
+    "summarize_controller_performance",
     "tracking_error",
     "validate_benchmark_replication_weights",
+    "MissingExecutionDataError",
+    "build_controller_stock_targets",
+    "simulate_stock_level_controller",
+    "validate_execution_constraints",
 ]

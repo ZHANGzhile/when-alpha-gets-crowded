@@ -72,7 +72,8 @@ try {
     Invoke-PythonStage "falsification_diagnostics" "32_run_falsification_diagnostics.py" @()
     Invoke-PythonStage "controller_exposure_schedule" "39_build_controller_exposure_schedule.py" @()
     Invoke-PythonStage "benchmark_replication_gate" "40_validate_benchmark_replication.py" @()
-    Write-Status "COMPLETE" "benchmark_replication_gate" "production P5-P7 completed"
+    Invoke-PythonStage "stock_level_controller" "41_run_stock_level_controller.py" @()
+    Write-Status "COMPLETE" "stock_level_controller" "stock-level controller paths completed"
 }
 catch {
     Write-Status "FAILED" "pipeline" $_.Exception.Message

@@ -87,6 +87,13 @@
 看似可交易的结果。公开口径依据见[中证800等权指数事实表](https://oss-ch.csindex.com.cn/static/html/csindex/public/uploads/indices/detail/files/zh_CN/000842factsheet.pdf)
 和[编制方案](https://oss-ch.csindex.com.cn/static/html/csindex/public/uploads/indices/detail/files/zh_CN/186_000842_Index_Methodology_cn.pdf)。
 
+8. P7还需要开盘时点的买入/卖出方向可交易性，输入契约为
+   `date、execution_at、available_at、code、can_buy、can_sell、reason`。`execution_at`和
+   `available_at`必须是可比较的UTC时间戳，且信息必须在模拟成交前到达。当前标准化日线只有
+   日级`tradestatus`，能识别停牌，不能可靠覆盖不同板块、ST和制度时期的开盘涨跌停规则，因此
+   不能拿收盘后状态反填开盘成交。股票级引擎已经支持拒单保留原持仓/现金，但正式运行继续受此
+   数据门保护。
+
 ## 放行决定
 
 本轮允许继续开发数据适配器和小样本工程流程；**不允许冻结最终研究协议，也不允许开始确认性结果分析**。

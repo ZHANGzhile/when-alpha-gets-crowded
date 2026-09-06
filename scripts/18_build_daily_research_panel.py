@@ -35,6 +35,8 @@ OUTPUT_COLUMNS = [
     "code",
     "close",
     "daily_return",
+    "overnight_return",
+    "intraday_return",
     "return_index",
     "volume",
     "amount",

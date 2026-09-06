@@ -15,8 +15,8 @@ def normalize_baostock_daily(frame: pd.DataFrame) -> pd.DataFrame:
     """
 
     required = {
-        "date", "code", "close", "volume", "amount", "turn", "tradestatus",
-        "pctChg", "pbMRQ", "isST",
+        "date", "code", "open", "close", "preclose", "volume", "amount",
+        "turn", "tradestatus", "pctChg", "pbMRQ", "isST",
     }
     missing = required - set(frame.columns)
     if missing:
@@ -26,14 +26,23 @@ def normalize_baostock_daily(frame: pd.DataFrame) -> pd.DataFrame:
     if out.duplicated(["date", "code"]).any():
         raise ValueError("raw daily data must be unique by date/code")
     out = out.sort_values(["code", "date"], kind="mergesort").reset_index(drop=True)
-    numeric = ["close", "volume", "amount", "turn", "pctChg", "pbMRQ"]
+    numeric = [
+        "open",
+        "close",
+        "preclose",
+        "volume",
+        "amount",
+        "turn",
+        "pctChg",
+        "pbMRQ",
+    ]
     out[numeric] = out[numeric].apply(pd.to_numeric, errors="coerce")
     out["tradestatus"] = pd.to_numeric(out["tradestatus"], errors="raise").astype(int)
     out["isST"] = pd.to_numeric(out["isST"], errors="raise").astype(int)
     if not out["tradestatus"].isin([0, 1]).all() or not out["isST"].isin([0, 1]).all():
         raise ValueError("tradestatus and isST must be binary")
-    if (out["close"].dropna() <= 0).any():
-        raise ValueError("close must be positive")
+    if (out[["open", "close", "preclose"]].dropna() <= 0).any().any():
+        raise ValueError("open, close, and preclose must be positive")
 
     out["daily_return"] = out["pctChg"] / 100.0
     suspended_missing = out["tradestatus"].eq(0) & out["daily_return"].isna()
@@ -44,6 +53,34 @@ def normalize_baostock_daily(frame: pd.DataFrame) -> pd.DataFrame:
         raise ValueError(f"tradable rows contain missing returns: {examples}")
     if (out["daily_return"] <= -1).any():
         raise ValueError("daily return at or below -100% requires terminal-event handling")
+    out["overnight_return"] = out["open"] / out["preclose"] - 1.0
+    out["intraday_return"] = out["close"] / out["open"] - 1.0
+    suspended = out["tradestatus"].eq(0)
+    out.loc[suspended, ["overnight_return", "intraday_return"]] = 0.0
+    traded_split_missing = out["tradestatus"].eq(1) & out[
+        ["overnight_return", "intraday_return"]
+    ].isna().any(axis=1)
+    if traded_split_missing.any():
+        examples = out.loc[traded_split_missing, ["date", "code"]].head()
+        raise ValueError(
+            "tradable rows lack open/close return split: "
+            f"{examples.to_dict('records')}"
+        )
+    reconstructed = (
+        (1.0 + out["overnight_return"]) * (1.0 + out["intraday_return"]) - 1.0
+    )
+    mismatch = out["tradestatus"].eq(1) & ~np.isclose(
+        reconstructed,
+        out["daily_return"],
+        rtol=0.0,
+        atol=5e-5,
+    )
+    if mismatch.any():
+        examples = out.loc[mismatch, ["date", "code"]].head()
+        raise ValueError(
+            "open/close return split does not reconstruct daily return: "
+            f"{examples.to_dict('records')}"
+        )
     out["return_index"] = (1.0 + out["daily_return"]).groupby(out["code"]).cumprod()
 
     current_float = out["volume"] / (out["turn"] / 100.0)

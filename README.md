@@ -35,6 +35,12 @@ State, Factor State, `G`, and `S` are already included.
   and next-session activation.
 - A point-in-time contract for tradable CSI 800 replication weights; membership-only and
   equal-weight substitutes are rejected before stock-level controller accounting.
+- A stock-level controller engine with post-cost target solving, daily holding drift, cash,
+  side-specific opening constraints, actual-trade costs, and a per-security rejection ledger.
+- Correct opening-rebalance return attribution: old holdings receive overnight returns, executed
+  targets receive intraday returns, and the two legs reconstruct close-to-close returns.
+- Absolute and CSI 800-relative P7 metrics, including Sharpe, Sortino, MDD, worst 20-session
+  return, tracking error, information ratio, Active MDD/CVaR, exposure, turnover, and rejections.
 - A protocol hash gate that blocks confirmatory outcomes until the P0 data gates are closed.
 
 The implementation rationale and problem log are in
@@ -56,10 +62,11 @@ work in progress because several gates are open:
   placebo path. Each of 100 pseudo-strategies has stable memberships, return ledgers,
   leave-one-out structural C, comparable G/S and factor states, identity-specific mature LS
   outcomes, and an independently tuned annual OOS M2/M3 comparison.
-- The controller exposure schedule and benchmark data gate are implemented. The stock-level,
-  costed P7 backtest remains blocked until point-in-time tradable CSI 800 replication weights are
-  supplied and accepted; the price-index series and constituent membership cannot determine those
-  weights.
+- The controller exposure schedule, benchmark data gate, and constrained stock-level accounting
+  engine are implemented. Production P7 remains blocked until point-in-time tradable CSI 800
+  replication weights and timestamped opening tradeability observations are supplied and accepted.
+  The fixed-low-exposure and volatility-control comparator parameters also remain protocol-freeze
+  decisions.
 
 Raw data, generated manifests, logs, model outputs, local reports, and source PDFs are excluded from
 Git. The repository contains reproducible code, configuration candidates, and audit notes.

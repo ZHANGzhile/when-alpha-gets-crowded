@@ -13,7 +13,8 @@ def raw_rows() -> pd.DataFrame:
         {
             "date": ["2024-01-02", "2024-01-03", "2024-01-04"],
             "code": ["x"] * 3,
-            "close": [10, 10, 11], "volume": [100, None, 110],
+            "open": [10, 10, 10.5], "close": [10, 10, 11],
+            "preclose": [10 / 1.01, 10, 10], "volume": [100, None, 110],
             "amount": [1000, None, 1210], "turn": [1, None, 1],
             "tradestatus": [1, 0, 1], "pctChg": [1, None, 10],
             "pbMRQ": [2, 2, -1], "isST": [0, 0, 1],
@@ -28,6 +29,12 @@ class NormalizeTests(unittest.TestCase):
         self.assertAlmostEqual(result.return_index.iloc[-1], 1.111)
         self.assertFalse(result.eligible_for_new_position.iloc[1])
         self.assertFalse(result.eligible_for_new_position.iloc[2])
+        reconstructed = (
+            (1.0 + result.overnight_return)
+            * (1.0 + result.intraday_return)
+            - 1.0
+        )
+        self.assertTrue(reconstructed.round(10).eq(result.daily_return.round(10)).all())
 
     def test_float_shares_only_observed_on_valid_turnover_then_carried_forward(self):
         result = normalize_baostock_daily(raw_rows())
