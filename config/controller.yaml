@@ -1,0 +1,19 @@
+schema_version: 1
+prediction_target: active_long_crash_20d
+information_models: [M2, M3, M4]
+primary_policy:
+  type: historical_risk_percentile_tiers
+  tiers:
+    - {upper_percentile: 0.60, active_weight: 1.00}
+    - {upper_percentile: 0.80, active_weight: 0.75}
+    - {upper_percentile: 0.90, active_weight: 0.50}
+    - {upper_percentile: 1.00, active_weight: 0.25}
+sensitivity_policy:
+  type: clipped_one_minus_probability
+  minimum_active_weight: 0.25
+cost_bps:
+  primary: 10
+  sensitivity: [5, 20]
+primary_application_metric: net_information_ratio
+guardrails: [active_mdd_not_worse, active_cvar_not_worse]
+

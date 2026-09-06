@@ -1,0 +1,24 @@
+schema_version: 1
+market: CN_A
+raw_start_date: 2012-01-01
+raw_end_date: 2026-08-31
+universe:
+  indices: [CSI300, CSI500]
+  membership_mode: point_in_time_union
+source:
+  primary: baostock
+  price_adjustment_for_returns: forward
+  price_adjustment_for_execution: none
+availability:
+  require_available_at: true
+  reject_future_records: true
+industry:
+  snapshot_frequency: monthly_last_trading_day
+  join_rule: latest_snapshot_not_after_decision
+  maximum_age_calendar_days: 45
+  taxonomy_break_reset: 2013-01-01
+filters:
+  trade_status: 1
+  is_st: 0
+  minimum_listing_trading_days: 120
+  minimum_signal_history_days: 252

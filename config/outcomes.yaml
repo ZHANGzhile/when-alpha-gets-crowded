@@ -1,0 +1,19 @@
+schema_version: 1
+primary:
+  target_family: research_ls
+  membership_mode: dynamic
+  horizon_trading_days: 20
+  crash_quantile: 0.10
+  threshold_history_trading_days: 756
+  minimum_mature_weekly_observations: 104
+secondary:
+  horizons_trading_days: [5, 60]
+  crash_quantiles: [0.05, 0.15]
+  membership_modes: [fixed]
+application:
+  target_family: active_long
+  benchmark: CSI800
+  relative_nav: wealth_ratio
+  horizon_trading_days: 20
+  crash_quantile: 0.10
+

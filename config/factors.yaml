@@ -1,0 +1,21 @@
+schema_version: 1
+rebalance: weekly_last_trading_day
+execution: next_trading_day
+portfolio_quantile: 0.10
+weighting: equal_at_rebalance_then_drift
+winsorization:
+  method: mad
+industry_ranking: within_industry_percentile
+factors:
+  momentum:
+    start_lag: 252
+    end_lag: 21
+  reversal:
+    lookback_days: 20
+  low_volatility:
+    lookback_days: 60
+  value:
+    field: pb_mrq
+    require_positive: true
+    primary_only_if_pit_audit_passes: true
+

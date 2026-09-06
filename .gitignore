@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.coverage
+.venv/
+.python-packages/
+build/
+dist/
+
+# Generated data and experiment outputs
+data/**
+runs/**
+results/**
+report/generated/**
+
+# Keep only the top-level data directory marker
+!data/.gitkeep
+
+# Local source reports and rendered review files
+*.pdf
+
+# Local PDF review intermediates
+tmp/

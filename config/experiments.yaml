@@ -1,0 +1,30 @@
+schema_version: 1
+primary_metric: out_of_sample_log_loss
+primary_comparison: M3_vs_M2
+key_mechanism_comparison: M4_vs_M3
+models:
+  M0: [factor_fixed_effects, market_state]
+  M1: [M0, factor_state]
+  M2: [M1, generic_portfolio_risk, stress_main_effects]
+  M3: [M2, structural_crowding]
+  M4: [M3, crowding_x_stress]
+estimator:
+  primary: l2_logistic
+  class_weight: none
+  c_grid: [0.01, 0.1, 1.0, 10.0, 100.0]
+  inner_time_validation:
+    splits: 3
+    validation_weeks_per_split: 26
+    minimum_training_weeks: 104
+  fixed_c_sensitivity: 1.0
+lead_time_trading_days: [0, 5, 10]
+development_period: [2020-01-01, 2023-12-31]
+confirmatory_period: [2024-01-01, 2026-08-31]
+bootstrap:
+  method: paired_moving_calendar_week_blocks
+  repetitions: 10000
+  primary_block_weeks: 13
+  sensitivity_block_weeks: [8, 26]
+placebos:
+  full_pipeline: true
+  time_misalignment_weeks: [26, 52]

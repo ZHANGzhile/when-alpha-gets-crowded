@@ -1,0 +1,18 @@
+schema_version: 1
+merger_replacements:
+  - index: CSI500
+    predecessor_code: sh.600270
+    successor_code: sh.601598
+    provider_gap_start: 2019-01-07
+    official_successor_effective: 2019-01-18
+    provider_successor_visible: 2019-01-21
+    announcement_available: 2018-12-17
+    source_url: "https://www.sse.com.cn/market/sseindex/diclosure/c/c_20181217_4694178.shtml"
+  - index: CSI500
+    predecessor_code: sh.600068
+    successor_code: sh.601868
+    provider_gap_start: 2021-09-13
+    official_successor_effective: 2021-09-28
+    provider_successor_visible: 2021-10-04
+    announcement_available: 2021-08-30
+    source_url: "https://www.sse.com.cn/market/sseindex/diclosure/c/c_20210830_5570656.shtml"

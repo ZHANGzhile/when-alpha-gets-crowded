@@ -1,0 +1,42 @@
+schema_version: 1
+structural_window_trading_days: 60
+historical_window_trading_days: 252
+historical_min_weekly_observations: 40
+placebo:
+  draws: 100
+  minimum_valid_draws: 80
+  seed: 42
+  match_on: [industry, lagged_liquidity]
+  optional_match_on: [size]
+  matching_information_lag_days: 20
+  liquidity_match_temperature: 0.75
+  maximum_mean_absolute_liquidity_z_difference: 0.35
+  maximum_attempts_per_draw: 50
+crowding_state:
+  components: [excess_residual_sync, excess_eigen, excess_strategy_convergence]
+  require_all_components: true
+  aggregation: equal_weight
+generic_risk:
+  components: [raw_residual_sync, raw_eigen, turnover_level, illiquidity_level]
+stress:
+  turnover_shock_recent_days: 5
+  turnover_baseline_days: 60
+  turnover_recent_minimum_days: 3
+  turnover_baseline_minimum_days: 40
+  turnover_sync_threshold: 1.5
+  illiquidity_recent_days: 20
+  illiquidity_baseline_days: 252
+  illiquidity_recent_minimum_days: 15
+  illiquidity_baseline_minimum_days: 126
+  factor_return_shock_days: 5
+  factor_return_baseline_days: 252
+  factor_return_baseline_minimum_days: 126
+  aggregation: equal_weight
+market_factor_state:
+  trailing_return_days: 20
+  volatility_short_days: 20
+  volatility_long_days: 60
+  drawdown_days: 252
+  rank_ic_horizon_days: 5
+  rank_ic_lookback_weekly_observations: 52
+  rank_ic_minimum_weekly_observations: 26
