@@ -52,6 +52,11 @@ from .convergence import (
 )
 from .portfolio_risk import factor_return_shock, portfolio_risk_characteristics
 from .states import causal_rank_ic_state, trailing_return_state
+from .pseudo_pipeline import (
+    leave_one_out_placebo_adjustment,
+    measure_continuous_pseudo_convergence,
+    measure_continuous_pseudo_structure,
+)
 
 __all__ = [
     "CROWDING_COMPONENTS",
@@ -88,4 +93,7 @@ __all__ = [
     "factor_return_shock",
     "causal_rank_ic_state",
     "trailing_return_state",
+    "leave_one_out_placebo_adjustment",
+    "measure_continuous_pseudo_convergence",
+    "measure_continuous_pseudo_structure",
 ]

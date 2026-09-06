@@ -29,4 +29,5 @@ placebos:
   full_pipeline: true
   continuous_strategy_count: 100
   continuous_strategy_seed: 1729
+  continuous_minimum_comparators: 80
   time_misalignment_weeks: [26, 52]

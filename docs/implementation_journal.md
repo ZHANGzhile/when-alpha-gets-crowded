@@ -60,6 +60,7 @@
 | D043 | 测试解释器与二进制依赖ABI不匹配 | RESOLVED | 显式使用项目兼容的Python 3.12 x64运行时 |
 | D044 | 每周随机组合缺少跨周策略身份 | RESOLVED | 固定pseudo ID定义整条行业内秩置换策略并运行真实收益账本 |
 | D045 | C可能只是市场或一般风险的重命名 | RESOLVED | 增加placebo-context、26/52周错位、相关和多元残差诊断 |
+| D046 | 伪策略不能进入自己的横截面基准 | RESOLVED | 对同日其他pseudo策略做leave-one-out校正后再做Historical Z |
 
 ## 记录模板
 
@@ -491,6 +492,16 @@ ID / 日期 / 状态
 - 最终解决办法：Crowding State和模型面板新增Residual Sync、Eigen Concentration及Strategy Convergence的原始placebo均值。脚本32用相同样本、fold、purge和调参预算运行`M2_context → M3_context`；另把C在同因子内严格滞后26/52个周观察、重算`C×S`后完整运行M2–M4。判别效度表报告Pearson、Spearman、单变量回归斜率/R²，并用全部一般风险比较变量做多元回归，报告adjusted R²与残差标准差。
 - 验证：测试确认错位字段不跨因子且来源日期严格早于目标日期；完全重命名的一般风险被识别为相关系数和R²均为1；含独立噪声的C保留非零残差。生产结果只能在协议冻结后生成。
 
+## D046 — 伪策略的结构异常不能使用包含自己的基准
+
+- 日期：2026-09-06
+- 状态：RESOLVED（Pseudo C阶段；G/S、Outcome与Prediction仍开放）
+- 问题：连续伪策略需要自己的PseudoCrowding。如果直接使用包含当前策略的100条伪策略均值和标准差，当前值会机械收缩自身Excess，且不再是严格的外部同期参照。
+- 分析与候选方案：每条pseudo策略先在真实60交易日行业残差窗口上独立计算Ledoit-Wolf Residual Sync和Eigen Concentration；同一pseudo ID的多个原始因子联合计算Strategy Convergence。随后对每个`date × original_factor × leg × feature`只使用其余99条策略形成同期基准，至少80条有效比较者且标准差大于零；失效时保留缺失与原因，不加epsilon。
+- 最终解决办法：新增leave-one-out横截面校正、连续伪策略结构测量和联合趋同函数。脚本34按日期原子检查点运行100条策略，保存raw、其他策略均值/标准差、Excess、PlaceboZ及有效比较数；再按`original_factor × pseudo_strategy_id × leg × feature`使用过去252个真实交易日范围和至少40个历史周做Historical Z，生成完整C与C_core。
+- 验证：三策略夹具确认被评估值从自身基准排除，零横截面方差保持无效；45日真实矩阵夹具确认Residual/Eigen和同ID跨因子Convergence都保留pseudo身份。完整回归检查114项全部通过，Python编译与YAML配置解析通过。
+- 开放边界：完整伪策略判断仍需把普通组合风险G、近期压力S、自己的成熟Crash阈值和年度OOS预测接入；当前产物不能单独用于`IncrementalValue_real > IncrementalValue_placebo`结论。
+
 ## 更新日志
 
 - 2026-09-05：创建本文；补录D001–D010。
@@ -515,3 +526,4 @@ ID / 日期 / 状态
 - 2026-09-06：实现Market/Factor State、因果RankIC、Long/Short模型特征面板及冻结后的M0–M4年度走查，记录D039–D040；完整检查101项通过。
 - 2026-09-06：实现按真实预警日重建阈值与特征的0/5/10日lead生产路径，以及首次日收益越界驱动的独立Crash事件研究，记录D041–D043；完整检查105项通过。
 - 2026-09-06：增加M2/M3 placebo-context、26/52周错位和判别效度生产诊断；实现100条连续行业内秩置换策略的稳定成员与完整收益账本，记录D044–D045；完整检查111项通过。
+- 2026-09-06：实现连续伪策略Residual/Eigen/Strategy Convergence、严格leave-one-out同期校正和逐策略Historical Z，记录D046；完整检查114项通过。

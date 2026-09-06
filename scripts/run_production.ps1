@@ -73,6 +73,7 @@ if ($Stage -in @("analysis", "all")) {
     Invoke-Stage "31_build_crash_event_study.py" @()
 }
 if ($Stage -in @("falsification", "all")) {
-    Invoke-Stage "33_build_continuous_pseudo_returns.py" @()
     Invoke-Stage "32_run_falsification_diagnostics.py" @()
+    Invoke-Stage "33_build_continuous_pseudo_returns.py" @()
+    Invoke-Stage "34_build_continuous_pseudo_crowding.py" @()
 }
