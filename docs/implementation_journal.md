@@ -58,6 +58,8 @@
 | D041 | Lead标签、阈值和模型拟合时点容易错位 | RESOLVED | 以真实issue_at重建阈值并向后连接特征状态 |
 | D042 | 周频Crash标签没有定义精确事件零 | RESOLVED | 用日收益路径的首次累计阈值越界日对齐事件 |
 | D043 | 测试解释器与二进制依赖ABI不匹配 | RESOLVED | 显式使用项目兼容的Python 3.12 x64运行时 |
+| D044 | 每周随机组合缺少跨周策略身份 | RESOLVED | 固定pseudo ID定义整条行业内秩置换策略并运行真实收益账本 |
+| D045 | C可能只是市场或一般风险的重命名 | RESOLVED | 增加placebo-context、26/52周错位、相关和多元残差诊断 |
 
 ## 记录模板
 
@@ -471,6 +473,24 @@ ID / 日期 / 状态
 - 最终解决办法：验证时显式设置`ALPHA_CROWDING_PYTHON`为Codex工作区提供的Python 3.12 x64运行时，继续让仓库脚本通过环境变量保持可移植性，不写入个人绝对路径。
 - 验证：新增lead与breach定向测试8项全部通过；完整回归检查105项全部通过，配置解析通过。
 
+## D044 — 每周匿名随机组合不能代表连续伪策略
+
+- 日期：2026-09-06
+- 状态：RESOLVED（成员与收益阶段；完整特征和预测阶段仍开放）
+- 问题：把每个日期的一组随机组合均值与真实因子比较，只能检验当期测量异常，无法回答同一条随机策略的Crowding增量是否也能预测它自己的未来Crash。直接把独立Long/Short matched draw按编号拼接还可能产生两腿持仓重叠。
+- 分析与候选方案：连续身份必须是一条可重放的策略生成规则，而不是事后给匿名组合编号。采用`base_seed × pseudo_strategy_id × decision_at × factor × algorithm_version`生成稳定种子，在每个时点只在相同行业内置换真实因子秩，再调用与真实因子完全相同的winsorization、行业排名、选腿、等权及权重漂移实现。这样候选股票池和行业条件保持PIT一致，同时Long/Short由一次统一分腿产生，天然互斥。
+- 最终解决办法：新增`within_industry_rank_permutation_v1`算法和脚本33。协议配置默认100条连续策略；成员按日期原子检查点，收益按pseudo ID检查点。每条策略跨周保留稳定ID，并使用同一`simulate_factor_leg_returns`路径执行次日生效、周内漂移和缺失持仓收益硬失败。清单保存真实信号哈希、逐组种子、候选数、两腿数量、重叠数和所有产物哈希。
+- 验证：测试确认三个pseudo ID跨两个决策周持续存在、相同输入逐行复现、不同策略/日期/因子种子不同、两腿无交集且每腿权重严格等于1。完整回归检查更新为111项通过。
+- 开放边界：该记录只关闭`Membership → Return`。每条伪策略自己的Residual/Eigen、Strategy Convergence、G/S、成熟阈值、Outcome与OOS Prediction仍必须继续实现，完成前不得声称完整full-pipeline placebo已经关闭。
+
+## D045 — Crowding需要placebo环境与判别效度证据
+
+- 日期：2026-09-06
+- 状态：RESOLVED（实现完成；生产执行受协议冻结门保护）
+- 问题：`Excess=Actual-PlaceboMean`时，M3改善可能来自新增的同期placebo环境；同时如果C与Market Vol、Factor Vol、Drawdown、Liquidity Stress或Generic Risk高度重合，不能把它解释成独立结构状态。
+- 最终解决办法：Crowding State和模型面板新增Residual Sync、Eigen Concentration及Strategy Convergence的原始placebo均值。脚本32用相同样本、fold、purge和调参预算运行`M2_context → M3_context`；另把C在同因子内严格滞后26/52个周观察、重算`C×S`后完整运行M2–M4。判别效度表报告Pearson、Spearman、单变量回归斜率/R²，并用全部一般风险比较变量做多元回归，报告adjusted R²与残差标准差。
+- 验证：测试确认错位字段不跨因子且来源日期严格早于目标日期；完全重命名的一般风险被识别为相关系数和R²均为1；含独立噪声的C保留非零残差。生产结果只能在协议冻结后生成。
+
 ## 更新日志
 
 - 2026-09-05：创建本文；补录D001–D010。
@@ -494,3 +514,4 @@ ID / 日期 / 状态
 - 2026-09-06：实现G/S组合特征与统一状态面板、Dynamic/Fixed真实前瞻结果路径，并增加确认期协议哈希门，记录D036–D038；完整检查99项通过。
 - 2026-09-06：实现Market/Factor State、因果RankIC、Long/Short模型特征面板及冻结后的M0–M4年度走查，记录D039–D040；完整检查101项通过。
 - 2026-09-06：实现按真实预警日重建阈值与特征的0/5/10日lead生产路径，以及首次日收益越界驱动的独立Crash事件研究，记录D041–D043；完整检查105项通过。
+- 2026-09-06：增加M2/M3 placebo-context、26/52周错位和判别效度生产诊断；实现100条连续行业内秩置换策略的稳定成员与完整收益账本，记录D044–D045；完整检查111项通过。

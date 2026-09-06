@@ -40,7 +40,7 @@
 - PB 的历史发布时间通过 PIT 审计前，Value 不进入主分析；
 - 历史行业分类切换还需完成实际指标影响量化；
 - 历史成分事件还需独立来源交叉核验；
-- 5/10 日提前量与 Crash 事件研究已经具备受协议门保护的生产入口；连续伪策略、稳健性分析和控制器生产运行仍待完成。
+- 5/10 日提前量、Crash 事件研究、M2/M3 placebo-context、26/52周错位和判别效度已经具备受协议门保护的生产入口；连续伪策略的100条稳定成员与收益账本已实现，完整伪策略C/G/S、Outcome与Prediction以及控制器生产运行仍待完成。
 
 原始数据、运行清单、日志、模型输出、本地报告和来源 PDF 不进入 Git。仓库保存可复现代码、候选冻结配置和审计记录。
 
@@ -74,6 +74,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage daily
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage measurements
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage analysis
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage falsification
 ```
 
 按依赖顺序运行完整流水线：

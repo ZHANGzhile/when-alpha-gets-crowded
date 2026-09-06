@@ -27,4 +27,6 @@ bootstrap:
   sensitivity_block_weeks: [8, 26]
 placebos:
   full_pipeline: true
+  continuous_strategy_count: 100
+  continuous_strategy_seed: 1729
   time_misalignment_weeks: [26, 52]

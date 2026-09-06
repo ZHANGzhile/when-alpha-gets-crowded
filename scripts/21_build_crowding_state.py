@@ -24,6 +24,11 @@ FEATURE_COLUMNS = {
     "eigen_concentration": "excess_eigen_historical_z",
     "strategy_convergence": "excess_overlap_historical_z",
 }
+PLACEBO_CONTEXT_COLUMNS = {
+    "residual_sync": "placebo_mean_residual_sync",
+    "eigen_concentration": "placebo_mean_eigen_concentration",
+    "strategy_convergence": "placebo_mean_strategy_convergence",
+}
 
 
 def _atomic_parquet(frame: pd.DataFrame, path: Path) -> None:
@@ -49,6 +54,11 @@ def main() -> int:
         columns="feature",
         values="excess_historical_z",
     ).rename(columns=FEATURE_COLUMNS)
+    placebo_context = long_features.pivot(
+        index=["decision_at", "factor", "leg"],
+        columns="feature",
+        values="placebo_mean",
+    ).rename(columns=PLACEBO_CONTEXT_COLUMNS)
     required_components = set(FEATURE_COLUMNS.values())
     absent_components = required_components - set(wide.columns)
     if absent_components:
@@ -64,7 +74,7 @@ def main() -> int:
             "crowding_state_component_count": "crowding_state_core_component_count",
         }
     )
-    output = pd.concat([wide, full, core], axis=1).reset_index()
+    output = pd.concat([wide, placebo_context, full, core], axis=1).reset_index()
     _atomic_parquet(output, OUTPUT)
     payload = {
         "schema_version": 1,

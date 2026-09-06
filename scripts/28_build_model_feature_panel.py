@@ -44,6 +44,9 @@ LEG_FIELDS = [
     "turnover_sync_z",
     "liquidity_stress_z",
     "factor_return_shock_z",
+    "placebo_mean_residual_sync",
+    "placebo_mean_eigen_concentration",
+    "placebo_mean_strategy_convergence",
 ]
 
 

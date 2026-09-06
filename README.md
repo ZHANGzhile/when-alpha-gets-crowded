@@ -47,7 +47,7 @@ work in progress because several gates are open:
 - PB publication timing must pass point-in-time review before Value enters the primary analysis;
 - the historical industry taxonomy transition needs a measured impact audit;
 - membership events need an independent cross-check;
-- 5/10-session lead and crash event-study production entry points are implemented behind the protocol gate; continuous pseudo-strategy, robustness, and controller runs remain.
+- Protocol-gated entry points now cover 5/10-session leads, crash event studies, M2/M3 placebo context, 26/52-week misalignment, and discriminant validity. Stable membership and return ledgers for 100 continuous pseudo-strategies are implemented; their full C/G/S, outcome, and prediction path and the production controller remain open.
 
 Raw data, generated manifests, logs, model outputs, local reports, and source PDFs are excluded from
 Git. The repository contains reproducible code, configuration candidates, and audit notes.
@@ -85,6 +85,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage daily
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage measurements
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage analysis
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage falsification
 ```
 
 Run the dependency-ordered pipeline:
