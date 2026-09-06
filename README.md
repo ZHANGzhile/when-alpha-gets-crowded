@@ -47,7 +47,7 @@ work in progress because several gates are open:
 - PB publication timing must pass point-in-time review before Value enters the primary analysis;
 - the historical industry taxonomy transition needs a measured impact audit;
 - membership events need an independent cross-check;
-- Protocol-gated entry points now cover 5/10-session leads, crash event studies, M2/M3 placebo context, 26/52-week misalignment, and discriminant validity. Stable membership, return ledgers, leave-one-out structural C, comparable G/S states, and identity-specific mature LS outcomes are implemented for 100 continuous pseudo-strategies; their prediction comparison and the production controller remain open.
+- Protocol-gated entry points now cover 5/10-session leads, crash event studies, M2/M3 placebo context, 26/52-week misalignment, discriminant validity, and the full continuous-strategy placebo path. Each of 100 pseudo-strategies has stable memberships, return ledgers, leave-one-out structural C, comparable G/S and factor states, identity-specific mature LS outcomes, and an independently tuned annual OOS M2/M3 comparison. Production results and the controller remain gated by data acceptance and protocol freeze.
 
 Raw data, generated manifests, logs, model outputs, local reports, and source PDFs are excluded from
 Git. The repository contains reproducible code, configuration candidates, and audit notes.

@@ -4,6 +4,7 @@ import pandas as pd
 
 from alpha_crowding.experiments import (
     build_continuous_permuted_memberships,
+    permute_signal_within_industry,
     stable_pseudo_seed,
 )
 
@@ -48,6 +49,23 @@ class ContinuousPseudoStrategyTests(unittest.TestCase):
         self.assertTrue(sums.round(12).eq(1.0).all())
         overlap = first.memberships.groupby(["date", "strategy_key", "code"])["leg"].nunique()
         self.assertTrue(overlap.le(1).all())
+
+    def test_full_signal_permutation_preserves_each_industry_distribution(self):
+        candidates = candidate_panel().loc[
+            lambda frame: frame["date"].eq("2024-01-05")
+        ]
+        permuted = permute_signal_within_industry(
+            candidates,
+            base_seed=19,
+            pseudo_strategy_id="pseudo_000",
+            decision_at="2024-01-05",
+            factor="MOM",
+        )
+        for industry, original in candidates.groupby("industry"):
+            generated = permuted.loc[
+                permuted["industry"].eq(industry), "permuted_signal"
+            ]
+            self.assertEqual(sorted(original["raw_signal"]), sorted(generated))
 
     def test_seed_changes_with_strategy_date_and_factor(self):
         base = stable_pseudo_seed(

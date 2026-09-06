@@ -3,9 +3,50 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+
+
+@dataclass(frozen=True)
+class MonteCarloRankResult:
+    observed: float
+    placebo_mean: float
+    placebo_std: float
+    percentile_midrank: float
+    probability_placebo_at_least_observed: float
+    valid_placebos: int
+
+
+def monte_carlo_incremental_rank(
+    observed: float,
+    placebo_values: Sequence[float],
+    *,
+    minimum_placebos: int = 80,
+) -> MonteCarloRankResult:
+    """Rank a real incremental value against continuous-strategy placebos."""
+
+    values = np.asarray(placebo_values, dtype=float)
+    values = values[np.isfinite(values)]
+    if not np.isfinite(observed):
+        raise ValueError("observed incremental value must be finite")
+    if len(values) < minimum_placebos:
+        raise ValueError(
+            f"at least {minimum_placebos} finite placebo values are required; found {len(values)}"
+        )
+    less = int(np.sum(values < observed))
+    equal = int(np.sum(values == observed))
+    return MonteCarloRankResult(
+        observed=float(observed),
+        placebo_mean=float(np.mean(values)),
+        placebo_std=float(np.std(values, ddof=1)),
+        percentile_midrank=float((less + 0.5 * equal) / len(values)),
+        probability_placebo_at_least_observed=float(
+            (1 + np.sum(values >= observed)) / (len(values) + 1)
+        ),
+        valid_placebos=len(values),
+    )
 
 
 def time_misalign_features(

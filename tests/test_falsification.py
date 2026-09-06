@@ -5,6 +5,7 @@ import pandas as pd
 
 from alpha_crowding.experiments import (
     discriminant_validity_table,
+    monte_carlo_incremental_rank,
     multivariate_residual_diagnostic,
     time_misalign_features,
 )
@@ -54,6 +55,20 @@ class DiscriminantValidityTests(unittest.TestCase):
         self.assertTrue(result.valid)
         self.assertGreater(result.r_squared, 0.5)
         self.assertGreater(result.residual_std, 0.0)
+
+
+class FullPipelinePlaceboRankTests(unittest.TestCase):
+    def test_rank_uses_midranks_and_finite_sample_tail_probability(self):
+        result = monte_carlo_incremental_rank(
+            3.0, [1.0, 2.0, 3.0, 4.0], minimum_placebos=4
+        )
+        self.assertAlmostEqual(result.percentile_midrank, 0.625)
+        self.assertAlmostEqual(result.probability_placebo_at_least_observed, 0.6)
+        self.assertEqual(result.valid_placebos, 4)
+
+    def test_rank_rejects_an_incomplete_placebo_distribution(self):
+        with self.assertRaisesRegex(ValueError, "at least 3"):
+            monte_carlo_incremental_rank(1.0, [0.0, np.nan], minimum_placebos=3)
 
 
 if __name__ == "__main__":

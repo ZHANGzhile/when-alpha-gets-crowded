@@ -37,6 +37,39 @@ def stable_pseudo_seed(
     return int.from_bytes(digest[:8], "big", signed=False)
 
 
+def permute_signal_within_industry(
+    candidates: pd.DataFrame,
+    *,
+    base_seed: int,
+    pseudo_strategy_id: str,
+    decision_at: object,
+    factor: str,
+) -> pd.DataFrame:
+    """Return the deterministic full-candidate signal used by one pseudo strategy."""
+
+    required = {"code", "industry", "raw_signal"}
+    missing = required - set(candidates.columns)
+    if missing:
+        raise KeyError(f"missing signal-permutation columns: {sorted(missing)}")
+    if candidates[list(required)].isna().any().any():
+        raise ValueError("signal-permutation fields must not be missing")
+    if candidates["code"].astype(str).duplicated().any():
+        raise ValueError("signal-permutation codes must be unique")
+    seed = stable_pseudo_seed(
+        base_seed,
+        pseudo_strategy_id=pseudo_strategy_id,
+        decision_at=decision_at,
+        factor=factor,
+    )
+    rng = np.random.default_rng(seed)
+    output = candidates.copy()
+    output["permuted_signal"] = output.groupby(
+        "industry", sort=True, group_keys=False
+    )["raw_signal"].transform(lambda values: rng.permutation(values.to_numpy()))
+    output["permutation_seed"] = seed
+    return output
+
+
 def build_continuous_permuted_memberships(
     candidates: pd.DataFrame,
     *,
@@ -91,12 +124,12 @@ def build_continuous_permuted_memberships(
                 decision_at=decision_at,
                 factor=str(factor),
             )
-            rng = np.random.default_rng(seed)
-            permuted = frame.copy()
-            permuted["permuted_signal"] = permuted.groupby(
-                "industry", sort=True, group_keys=False
-            )["raw_signal"].transform(
-                lambda values: rng.permutation(values.to_numpy())
+            permuted = permute_signal_within_industry(
+                frame,
+                base_seed=base_seed,
+                pseudo_strategy_id=pseudo_id,
+                decision_at=decision_at,
+                factor=str(factor),
             )
             assigned = assign_legs(
                 permuted,

@@ -23,7 +23,9 @@ from .walk_forward import (
 )
 from .lead import attach_lead_features, build_lead_labels
 from .falsification import (
+    MonteCarloRankResult,
     discriminant_validity_table,
+    monte_carlo_incremental_rank,
     multivariate_residual_diagnostic,
     time_misalign_features,
 )
@@ -31,6 +33,7 @@ from .pseudo import (
     ContinuousPseudoMembershipResult,
     PSEUDO_ALGORITHM_VERSION,
     build_continuous_permuted_memberships,
+    permute_signal_within_industry,
     stable_pseudo_seed,
 )
 from .protocol import require_protocol_freeze
@@ -40,6 +43,7 @@ __all__ = [
     "ContinuousPseudoMembershipResult",
     "AnnualFold",
     "NestedPredictionResult",
+    "MonteCarloRankResult",
     "PSEUDO_ALGORITHM_VERSION",
     "RegularizationSearchResult",
     "WalkForwardResult",
@@ -48,11 +52,13 @@ __all__ = [
     "assert_lead_time_information_cutoff",
     "binary_log_loss",
     "build_continuous_permuted_memberships",
+    "permute_signal_within_industry",
     "build_lead_labels",
     "common_complete_case_mask",
     "discriminant_validity_table",
     "fit_nested_logistic_models",
     "moving_block_bootstrap_mean",
+    "monte_carlo_incremental_rank",
     "multivariate_residual_diagnostic",
     "purge_training_rows",
     "purged_training_mask",
