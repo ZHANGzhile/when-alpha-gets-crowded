@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("membership", "daily", "benchmark", "industry", "signals", "daily_panel", "portfolios", "measurements", "returns", "states", "outcomes", "models", "all")]
+    [ValidateSet("membership", "daily", "benchmark", "industry", "signals", "daily_panel", "portfolios", "measurements", "returns", "states", "outcomes", "models", "analysis", "all")]
     [string]$Stage = "all",
     [int]$MembershipWorkers = 4,
     [int]$DailyWorkers = 4,
@@ -67,4 +67,8 @@ if ($Stage -in @("outcomes", "all")) {
 }
 if ($Stage -in @("models", "all")) {
     Invoke-Stage "29_run_primary_walk_forward.py" @()
+}
+if ($Stage -in @("analysis", "all")) {
+    Invoke-Stage "30_run_lead_time_walk_forward.py" @()
+    Invoke-Stage "31_build_crash_event_study.py" @()
 }

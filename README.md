@@ -47,7 +47,7 @@ work in progress because several gates are open:
 - PB publication timing must pass point-in-time review before Value enters the primary analysis;
 - the historical industry taxonomy transition needs a measured impact audit;
 - membership events need an independent cross-check;
-- continuous pseudo-strategy, lead-time, event-study, robustness, and controller runs remain.
+- 5/10-session lead and crash event-study production entry points are implemented behind the protocol gate; continuous pseudo-strategy, robustness, and controller runs remain.
 
 Raw data, generated manifests, logs, model outputs, local reports, and source PDFs are excluded from
 Git. The repository contains reproducible code, configuration candidates, and audit notes.
@@ -84,6 +84,7 @@ Run individual stages:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage membership
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage daily
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage measurements
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage analysis
 ```
 
 Run the dependency-ordered pipeline:

@@ -2,7 +2,11 @@ import unittest
 
 import pandas as pd
 
-from alpha_crowding.outcomes import build_event_study_panel, merge_crash_episodes
+from alpha_crowding.outcomes import (
+    build_event_study_panel,
+    first_threshold_breach_at,
+    merge_crash_episodes,
+)
 
 
 def event_frame() -> pd.DataFrame:
@@ -77,6 +81,33 @@ class CrashEpisodeTests(unittest.TestCase):
         self.assertEqual(zero.aligned_event_at, pd.Timestamp("2024-01-12"))
         self.assertTrue(study.relative_week.min() >= -8)
         self.assertTrue(study.relative_week.max() <= 4)
+
+    def test_first_threshold_breach_uses_cumulative_path(self):
+        sessions = pd.bdate_range("2024-01-02", periods=8)
+        returns = pd.Series(
+            [0.0, 0.0, -0.04, -0.07, 0.02, 0.01, 0.0, 0.0],
+            index=sessions,
+        )
+        breach = first_threshold_breach_at(
+            returns,
+            sessions,
+            decision_at=sessions[1],
+            horizon_sessions=4,
+            threshold=-0.10,
+        )
+        self.assertEqual(breach, sessions[3])
+
+    def test_nonbreaching_path_is_rejected(self):
+        sessions = pd.bdate_range("2024-01-02", periods=6)
+        returns = pd.Series(0.01, index=sessions)
+        with self.assertRaisesRegex(ValueError, "does not breach"):
+            first_threshold_breach_at(
+                returns,
+                sessions,
+                decision_at=sessions[0],
+                horizon_sessions=3,
+                threshold=-0.05,
+            )
 
 
 if __name__ == "__main__":

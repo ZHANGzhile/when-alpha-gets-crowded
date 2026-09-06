@@ -4,7 +4,58 @@ from __future__ import annotations
 
 from typing import Sequence
 
+import numpy as np
 import pandas as pd
+
+
+def first_threshold_breach_at(
+    portfolio_returns: pd.Series,
+    trading_calendar: Sequence[object],
+    *,
+    decision_at: object,
+    horizon_sessions: int,
+    threshold: float,
+    benchmark_returns: pd.Series | None = None,
+) -> pd.Timestamp:
+    """Return the first future session whose cumulative outcome breaches a threshold."""
+
+    if horizon_sessions < 1:
+        raise ValueError("horizon_sessions must be positive")
+    cutoff = float(threshold)
+    if not np.isfinite(cutoff):
+        raise ValueError("threshold must be finite")
+    calendar = pd.DatetimeIndex(pd.to_datetime(list(trading_calendar), errors="raise")).normalize()
+    if calendar.has_duplicates or not calendar.is_monotonic_increasing:
+        raise ValueError("trading_calendar must be unique and increasing")
+    decision = pd.Timestamp(decision_at).normalize()
+    position = int(calendar.get_indexer([decision])[0])
+    if position < 0:
+        raise ValueError("decision_at must be a trading session")
+    if position + horizon_sessions >= len(calendar):
+        raise ValueError("outcome horizon extends beyond the trading calendar")
+    dates = calendar[position + 1 : position + horizon_sessions + 1]
+
+    def aligned(series: pd.Series, name: str) -> np.ndarray:
+        values = pd.Series(
+            pd.to_numeric(series, errors="coerce").to_numpy(dtype=float),
+            index=pd.DatetimeIndex(pd.to_datetime(series.index, errors="raise")).normalize(),
+        ).reindex(dates)
+        if values.isna().any():
+            raise ValueError(f"{name} is missing inside the outcome window")
+        if (values <= -1.0).any():
+            raise ValueError(f"{name} contains a return at or below -100%")
+        return values.to_numpy(dtype=float)
+
+    portfolio = aligned(portfolio_returns, "portfolio_returns")
+    wealth = np.cumprod(1.0 + portfolio)
+    if benchmark_returns is not None:
+        benchmark = aligned(benchmark_returns, "benchmark_returns")
+        wealth = wealth / np.cumprod(1.0 + benchmark)
+    cumulative = wealth - 1.0
+    breached = np.flatnonzero(cumulative <= cutoff)
+    if len(breached) == 0:
+        raise ValueError("the supplied outcome does not breach its threshold")
+    return pd.Timestamp(dates[int(breached[0])])
 
 
 def _date_column(frame: pd.DataFrame, column: str) -> pd.Series:
@@ -192,7 +243,13 @@ def build_event_study_panel(
         parts.append(part)
     if not parts:
         return pd.DataFrame(
-            columns=[*weekly_panel.columns, "episode_id", "event_at", "aligned_event_at", "relative_week"]
+            columns=[
+                *weekly_panel.columns,
+                "episode_id",
+                "event_at",
+                "aligned_event_at",
+                "relative_week",
+            ]
         )
     return pd.concat(parts, ignore_index=True).sort_values(
         ["episode_id", "relative_week"]

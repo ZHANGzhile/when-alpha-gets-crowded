@@ -61,7 +61,9 @@ try {
     Invoke-PythonStage "dynamic_outcomes" "25_build_dynamic_outcomes.py" @()
     Invoke-PythonStage "fixed_outcomes" "26_build_fixed_outcomes.py" @()
     Invoke-PythonStage "primary_walk_forward" "29_run_primary_walk_forward.py" @()
-    Write-Status "COMPLETE" "primary_walk_forward" "production M0-M4 walk-forward comparison completed"
+    Invoke-PythonStage "lead_time_walk_forward" "30_run_lead_time_walk_forward.py" @()
+    Invoke-PythonStage "crash_event_study" "31_build_crash_event_study.py" @()
+    Write-Status "COMPLETE" "crash_event_study" "production P5 analysis completed"
 }
 catch {
     Write-Status "FAILED" "pipeline" $_.Exception.Message

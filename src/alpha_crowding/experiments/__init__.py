@@ -21,6 +21,7 @@ from .walk_forward import (
     annual_expanding_folds,
     run_annual_walk_forward,
 )
+from .lead import attach_lead_features, build_lead_labels
 from .protocol import require_protocol_freeze
 
 __all__ = [
@@ -30,8 +31,10 @@ __all__ = [
     "RegularizationSearchResult",
     "WalkForwardResult",
     "annual_expanding_folds",
+    "attach_lead_features",
     "assert_lead_time_information_cutoff",
     "binary_log_loss",
+    "build_lead_labels",
     "common_complete_case_mask",
     "fit_nested_logistic_models",
     "moving_block_bootstrap_mean",
