@@ -1,9 +1,12 @@
 import math
 import unittest
 
+import pandas as pd
+
 from alpha_crowding.backtest import (
     active_weights_from_oos_probabilities,
     arithmetic_active_returns,
+    build_oos_exposure_schedule,
     calculate_rebalance,
     combine_stock_target_weights,
     drift_weights,
@@ -13,6 +16,7 @@ from alpha_crowding.backtest import (
     rebalance_after_drift,
     relative_nav,
     risk_percentile_to_active_weight,
+    validate_benchmark_replication_weights,
 )
 
 
@@ -57,6 +61,49 @@ class ControllerPolicyTests(unittest.TestCase):
     def test_probability_policy_is_only_the_clipped_sensitivity(self):
         self.assertEqual(probability_to_active_weight(0.1), 0.9)
         self.assertEqual(probability_to_active_weight(0.9), 0.25)
+
+    def test_exposure_schedule_uses_only_earlier_same_factor_predictions(self):
+        calendar = pd.bdate_range("2024-01-01", periods=16)
+        dates = calendar[[1, 6, 11]]
+        predictions = pd.DataFrame(
+            {
+                "decision_at": list(dates) * 2,
+                "factor": ["A"] * 3 + ["B"] * 3,
+                "probability_M2": [0.1, 0.2, 0.9, 0.9, 0.8, 0.1],
+            }
+        )
+        result = build_oos_exposure_schedule(
+            predictions,
+            calendar,
+            probability_columns=("probability_M2",),
+            minimum_history_weeks=2,
+        )
+        current = result.loc[result["decision_at"].eq(dates[-1])].set_index("factor")
+        self.assertEqual(current.loc["A", "active_weight_M2"], 0.25)
+        self.assertEqual(current.loc["B", "active_weight_M2"], 1.0)
+        self.assertEqual(current.loc["A", "effective_at"], calendar[12])
+        warmup = result["decision_at"].isin(dates[:2])
+        self.assertTrue(result.loc[warmup, "active_weight_M2"].isna().all())
+
+    def test_benchmark_contract_enforces_pit_and_full_investment(self):
+        valid = pd.DataFrame(
+            {
+                "decision_at": ["2024-01-05", "2024-01-05"],
+                "available_at": ["2024-01-04", "2024-01-05"],
+                "code": ["a", "b"],
+                "weight": [0.4, 0.6],
+            }
+        )
+        checked = validate_benchmark_replication_weights(valid)
+        self.assertAlmostEqual(checked["weight"].sum(), 1.0)
+        late = valid.copy()
+        late.loc[0, "available_at"] = "2024-01-08"
+        with self.assertRaisesRegex(ValueError, "not available"):
+            validate_benchmark_replication_weights(late)
+        incomplete = valid.copy()
+        incomplete.loc[0, "weight"] = 0.3
+        with self.assertRaisesRegex(ValueError, "sum to one"):
+            validate_benchmark_replication_weights(incomplete)
 
 
 class StockAccountingTests(unittest.TestCase):

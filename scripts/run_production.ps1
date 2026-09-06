@@ -1,5 +1,5 @@
 param(
-    [ValidateSet("membership", "daily", "benchmark", "industry", "signals", "daily_panel", "portfolios", "measurements", "returns", "states", "outcomes", "models", "analysis", "falsification", "all")]
+    [ValidateSet("membership", "daily", "benchmark", "industry", "signals", "daily_panel", "portfolios", "measurements", "returns", "states", "outcomes", "models", "analysis", "falsification", "controller", "all")]
     [string]$Stage = "all",
     [int]$MembershipWorkers = 4,
     [int]$DailyWorkers = 4,
@@ -88,4 +88,8 @@ if ($Stage -in @("falsification", "all")) {
         Invoke-Stage "37_build_continuous_pseudo_model_features.py" @()
     }
     Invoke-Stage "32_run_falsification_diagnostics.py" @()
+}
+if ($Stage -in @("controller", "all")) {
+    Invoke-Stage "39_build_controller_exposure_schedule.py" @()
+    Invoke-Stage "40_validate_benchmark_replication.py" @()
 }

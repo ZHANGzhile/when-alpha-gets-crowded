@@ -25,6 +25,8 @@
 - Market、Factor、`C`、`G`、`S` 状态表，并保留有效性、覆盖率和窗口边界。
 - Dynamic LS、Long/Short 分解、Active Long/CSI800 以及 Fixed-membership 前瞻结果路径。
 - 年度扩展窗 M0–M4 Logistic 比较、训练期内净化时间验证和成对移动块 bootstrap。
+- M2/M3/M4 严格按同一因子的历史 OOS 概率生成仓位，预热期为52周，并在下一交易日生效。
+- 可交易 CSI 800 复制权重的 PIT 数据契约；只有成分集合或简单等权会在股票级控制器前被拒绝。
 - 协议哈希门：P0 数据门未关闭时，不允许生成确认期结果。
 
 完整困难、判断过程和解决办法记录在
@@ -40,7 +42,8 @@
 - PB 的历史发布时间通过 PIT 审计前，Value 不进入主分析；
 - 历史行业分类切换还需完成实际指标影响量化；
 - 历史成分事件还需独立来源交叉核验；
-- 5/10 日提前量、Crash 事件研究、M2/M3 placebo-context、26/52周错位、判别效度和完整连续伪策略路径已经具备受协议门保护的生产入口。100条伪策略各自拥有稳定成员、收益账本、leave-one-out结构C、同口径G/S与因子状态、逐策略成熟LS Outcome，以及独立调参的年度OOS M2/M3比较；生产结果与控制器仍等待数据验收和协议冻结。
+- 5/10 日提前量、Crash 事件研究、M2/M3 placebo-context、26/52周错位、判别效度和完整连续伪策略路径已经具备受协议门保护的生产入口。100条伪策略各自拥有稳定成员、收益账本、leave-one-out结构C、同口径G/S与因子状态、逐策略成熟LS Outcome，以及独立调参的年度OOS M2/M3比较。
+- 控制器的OOS暴露日程与基准数据门已经实现。股票级、含成本的P7回测仍等待PIT可交易CSI 800复制权重通过验收；价格指数序列和成分集合本身无法确定这些权重。
 
 原始数据、运行清单、日志、模型输出、本地报告和来源 PDF 不进入 Git。仓库保存可复现代码、候选冻结配置和审计记录。
 
@@ -75,6 +78,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage measurements
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage analysis
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage falsification
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage controller
 ```
 
 按依赖顺序运行完整流水线：

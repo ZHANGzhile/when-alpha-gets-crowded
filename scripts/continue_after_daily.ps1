@@ -70,7 +70,9 @@ try {
     Invoke-PythonStage "lead_time_walk_forward" "30_run_lead_time_walk_forward.py" @()
     Invoke-PythonStage "crash_event_study" "31_build_crash_event_study.py" @()
     Invoke-PythonStage "falsification_diagnostics" "32_run_falsification_diagnostics.py" @()
-    Write-Status "COMPLETE" "falsification_diagnostics" "production P5 and P6 completed"
+    Invoke-PythonStage "controller_exposure_schedule" "39_build_controller_exposure_schedule.py" @()
+    Invoke-PythonStage "benchmark_replication_gate" "40_validate_benchmark_replication.py" @()
+    Write-Status "COMPLETE" "benchmark_replication_gate" "production P5-P7 completed"
 }
 catch {
     Write-Status "FAILED" "pipeline" $_.Exception.Message

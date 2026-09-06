@@ -3,6 +3,7 @@ prediction_target: active_long_crash_20d
 information_models: [M2, M3, M4]
 primary_policy:
   type: historical_risk_percentile_tiers
+  minimum_history_weeks: 52
   tiers:
     - {upper_percentile: 0.60, active_weight: 1.00}
     - {upper_percentile: 0.80, active_weight: 0.75}
@@ -16,4 +17,3 @@ cost_bps:
   sensitivity: [5, 20]
 primary_application_metric: net_information_ratio
 guardrails: [active_mdd_not_worse, active_cvar_not_worse]
-

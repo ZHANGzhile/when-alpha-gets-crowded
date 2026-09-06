@@ -7,9 +7,11 @@ from .accounting import (
     drift_weights,
     rebalance_after_drift,
 )
+from .benchmark import validate_benchmark_replication_weights
 from .controller import (
     DEFAULT_RISK_BANDS,
     active_weights_from_oos_probabilities,
+    build_oos_exposure_schedule,
     historical_risk_percentile,
     probability_to_active_weight,
     risk_percentile_to_active_weight,
@@ -31,6 +33,7 @@ __all__ = [
     "RelativePerformance",
     "active_cvar",
     "active_weights_from_oos_probabilities",
+    "build_oos_exposure_schedule",
     "arithmetic_active_returns",
     "calculate_rebalance",
     "combine_stock_target_weights",
@@ -44,4 +47,5 @@ __all__ = [
     "relative_nav",
     "risk_percentile_to_active_weight",
     "tracking_error",
+    "validate_benchmark_replication_weights",
 ]

@@ -77,6 +77,15 @@
 4. 退市股票、长期停牌、ST切换、上市日和异常零成交覆盖。
 5. 20只股票的复权、换手和流通股估算抽查。
 6. 全量抓取速度、重试、断点续传与服务端限速。
+7. P7需要每个控制器决策日已经可知、可交易且合计为1的CSI 800复制篮子权重。当前只有
+   CSI 300/CSI 500历史成员和CSI 800价格指数收益；二者不能反推出复制权重。中证800等权指数
+   另有独立代码000842与独立编制方案，因此不能用800只成分简单等权来替代000906基准。
+
+第7项的输入契约是`decision_at、available_at、code、weight`，要求`available_at <= decision_at`、
+同一决策日证券唯一、权重非负且严格合计为1。入口脚本为
+`scripts/40_validate_benchmark_replication.py`；数据到位前，股票级含成本控制器必须停止，不能输出
+看似可交易的结果。公开口径依据见[中证800等权指数事实表](https://oss-ch.csindex.com.cn/static/html/csindex/public/uploads/indices/detail/files/zh_CN/000842factsheet.pdf)
+和[编制方案](https://oss-ch.csindex.com.cn/static/html/csindex/public/uploads/indices/detail/files/zh_CN/186_000842_Index_Methodology_cn.pdf)。
 
 ## 放行决定
 

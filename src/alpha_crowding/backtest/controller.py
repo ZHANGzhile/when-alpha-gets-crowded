@@ -11,6 +11,8 @@ from __future__ import annotations
 from math import isfinite
 from typing import Iterable, Optional, Sequence, Tuple
 
+import pandas as pd
+
 
 # ``percentile < upper_bound`` selects a band.  The final bound includes 1.0.
 DEFAULT_RISK_BANDS: Tuple[Tuple[float, float], ...] = (
@@ -146,3 +148,65 @@ def probability_to_active_weight(
     if lower > upper:
         raise ValueError("minimum_weight must not exceed maximum_weight")
     return min(upper, max(lower, 1.0 - risk))
+
+
+def build_oos_exposure_schedule(
+    predictions: pd.DataFrame,
+    trading_calendar: pd.DatetimeIndex,
+    *,
+    probability_columns: Sequence[str],
+    minimum_history_weeks: int,
+    bands: Sequence[Tuple[float, float]] = DEFAULT_RISK_BANDS,
+    date_col: str = "decision_at",
+    factor_col: str = "factor",
+) -> pd.DataFrame:
+    """Build next-session exposures from strictly earlier same-factor OOS history."""
+
+    columns = tuple(probability_columns)
+    if not columns or len(set(columns)) != len(columns):
+        raise ValueError("probability_columns must be nonempty and unique")
+    if minimum_history_weeks < 1:
+        raise ValueError("minimum_history_weeks must be positive")
+    required = {date_col, factor_col, *columns}
+    missing = required - set(predictions.columns)
+    if missing:
+        raise KeyError(f"missing exposure-schedule columns: {sorted(missing)}")
+    frame = predictions[[date_col, factor_col, *columns]].copy()
+    frame[date_col] = pd.to_datetime(frame[date_col], errors="raise").dt.normalize()
+    if frame.duplicated([date_col, factor_col]).any():
+        raise ValueError("predictions must be unique by decision date and factor")
+    calendar = pd.DatetimeIndex(pd.to_datetime(trading_calendar)).normalize()
+    calendar = calendar.drop_duplicates().sort_values()
+    locations = calendar.get_indexer(frame[date_col])
+    if (locations < 0).any() or (locations + 1 >= len(calendar)).any():
+        raise ValueError("every decision needs a next trading session")
+    frame["effective_at"] = calendar[locations + 1]
+
+    rows = []
+    for factor, group in frame.groupby(factor_col, sort=True):
+        ordered = group.sort_values(date_col)
+        histories = {column: [] for column in columns}
+        for _, current in ordered.iterrows():
+            row = {
+                "decision_at": current[date_col],
+                "effective_at": current["effective_at"],
+                "factor": factor,
+            }
+            for column in columns:
+                probability = _as_probability(current[column], name=column)
+                percentile = historical_risk_percentile(
+                    probability,
+                    histories[column],
+                    min_history=minimum_history_weeks,
+                )
+                model = column.removeprefix("probability_")
+                row[f"probability_{model}"] = probability
+                row[f"risk_percentile_{model}"] = percentile
+                row[f"active_weight_{model}"] = (
+                    None
+                    if percentile is None
+                    else risk_percentile_to_active_weight(percentile, bands=bands)
+                )
+                histories[column].append(probability)
+            rows.append(row)
+    return pd.DataFrame(rows).sort_values(["decision_at", "factor"]).reset_index(drop=True)

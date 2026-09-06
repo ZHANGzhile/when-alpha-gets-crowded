@@ -31,6 +31,10 @@ State, Factor State, `G`, and `S` are already included.
 - Dynamic LS, leg-level, Active Long/CSI 800, and fixed-membership outcome builders.
 - Annual expanding M0-M4 logistic comparisons with purged inner validation and paired
   moving-block bootstrap inference.
+- Strictly historical, same-factor OOS exposure schedules for M2/M3/M4, with a 52-week warm-up
+  and next-session activation.
+- A point-in-time contract for tradable CSI 800 replication weights; membership-only and
+  equal-weight substitutes are rejected before stock-level controller accounting.
 - A protocol hash gate that blocks confirmatory outcomes until the P0 data gates are closed.
 
 The implementation rationale and problem log are in
@@ -47,7 +51,15 @@ work in progress because several gates are open:
 - PB publication timing must pass point-in-time review before Value enters the primary analysis;
 - the historical industry taxonomy transition needs a measured impact audit;
 - membership events need an independent cross-check;
-- Protocol-gated entry points now cover 5/10-session leads, crash event studies, M2/M3 placebo context, 26/52-week misalignment, discriminant validity, and the full continuous-strategy placebo path. Each of 100 pseudo-strategies has stable memberships, return ledgers, leave-one-out structural C, comparable G/S and factor states, identity-specific mature LS outcomes, and an independently tuned annual OOS M2/M3 comparison. Production results and the controller remain gated by data acceptance and protocol freeze.
+- Protocol-gated entry points now cover 5/10-session leads, crash event studies, M2/M3 placebo
+  context, 26/52-week misalignment, discriminant validity, and the full continuous-strategy
+  placebo path. Each of 100 pseudo-strategies has stable memberships, return ledgers,
+  leave-one-out structural C, comparable G/S and factor states, identity-specific mature LS
+  outcomes, and an independently tuned annual OOS M2/M3 comparison.
+- The controller exposure schedule and benchmark data gate are implemented. The stock-level,
+  costed P7 backtest remains blocked until point-in-time tradable CSI 800 replication weights are
+  supplied and accepted; the price-index series and constituent membership cannot determine those
+  weights.
 
 Raw data, generated manifests, logs, model outputs, local reports, and source PDFs are excluded from
 Git. The repository contains reproducible code, configuration candidates, and audit notes.
@@ -86,6 +98,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage measurements
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage analysis
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage falsification
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage controller
 ```
 
 Run the dependency-ordered pipeline:
