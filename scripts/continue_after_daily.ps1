@@ -63,6 +63,7 @@ try {
     Invoke-PythonStage "continuous_pseudo_state" "35_build_continuous_pseudo_state.py" @()
     Invoke-PythonStage "dynamic_outcomes" "25_build_dynamic_outcomes.py" @()
     Invoke-PythonStage "fixed_outcomes" "26_build_fixed_outcomes.py" @()
+    Invoke-PythonStage "continuous_pseudo_outcomes" "36_build_continuous_pseudo_outcomes.py" @()
     Invoke-PythonStage "primary_walk_forward" "29_run_primary_walk_forward.py" @()
     Invoke-PythonStage "lead_time_walk_forward" "30_run_lead_time_walk_forward.py" @()
     Invoke-PythonStage "crash_event_study" "31_build_crash_event_study.py" @()

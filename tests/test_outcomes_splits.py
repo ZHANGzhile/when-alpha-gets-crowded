@@ -96,6 +96,41 @@ class MatureTailLabelTests(unittest.TestCase):
         self.assertEqual(result.iloc[1]["mature_history_count"], 0)
         self.assertTrue(pd.isna(result.iloc[1]["tail_event"]))
 
+    def test_continuous_pseudo_thresholds_do_not_cross_strategy_identity(self) -> None:
+        s = self.sessions
+        outcomes = pd.DataFrame(
+            {
+                "original_factor": ["MOM"] * 4,
+                "pseudo_strategy_id": ["p0", "p0", "p1", "p1"],
+                "target_family": ["research_ls"] * 4,
+                "membership_mode": ["continuous_pseudo_dynamic"] * 4,
+                "horizon_sessions": [2] * 4,
+                "decision_at": [s[0], s[4], s[0], s[4]],
+                "label_start_at": [s[1], s[5], s[1], s[5]],
+                "label_end_at": [s[2], s[6], s[2], s[6]],
+                "future_return": [-0.10, -0.20, -0.80, -0.20],
+            }
+        )
+        result = build_mature_tail_labels(
+            outcomes,
+            sessions=s,
+            group_cols=(
+                "original_factor",
+                "pseudo_strategy_id",
+                "target_family",
+                "membership_mode",
+                "horizon_sessions",
+            ),
+            spec=MatureTailSpec(lookback_sessions=10, min_history=1),
+        )
+        current = result.loc[result["decision_at"].eq(s[4])].set_index(
+            "pseudo_strategy_id"
+        )
+        self.assertAlmostEqual(current.loc["p0", "historical_tail_threshold"], -0.10)
+        self.assertAlmostEqual(current.loc["p1", "historical_tail_threshold"], -0.80)
+        self.assertTrue(bool(current.loc["p0", "tail_event"]))
+        self.assertFalse(bool(current.loc["p1", "tail_event"]))
+
 
 class ActiveRiskTests(unittest.TestCase):
     def test_relative_nav_is_ratio_of_compounded_wealth(self) -> None:

@@ -69,6 +69,7 @@ if ($Stage -eq "all") {
 if ($Stage -in @("outcomes", "all")) {
     Invoke-Stage "25_build_dynamic_outcomes.py" @()
     Invoke-Stage "26_build_fixed_outcomes.py" @()
+    Invoke-Stage "36_build_continuous_pseudo_outcomes.py" @()
 }
 if ($Stage -in @("models", "all")) {
     Invoke-Stage "29_run_primary_walk_forward.py" @()
