@@ -50,9 +50,16 @@ from .convergence import (
     measure_strategy_convergence_placebos,
     pairwise_jaccard,
 )
-from .portfolio_risk import factor_return_shock, portfolio_risk_characteristics
+from .portfolio_risk import (
+    aggregate_stock_risk_groups,
+    aggregate_stock_risk_characteristics,
+    factor_return_shock,
+    portfolio_risk_characteristics,
+    stock_risk_characteristics,
+)
 from .states import causal_rank_ic_state, trailing_return_state
 from .pseudo_pipeline import (
+    assemble_continuous_pseudo_state,
     leave_one_out_placebo_adjustment,
     measure_continuous_pseudo_convergence,
     measure_continuous_pseudo_structure,
@@ -90,10 +97,14 @@ __all__ = [
     "measure_strategy_convergence_placebos",
     "pairwise_jaccard",
     "portfolio_risk_characteristics",
+    "stock_risk_characteristics",
+    "aggregate_stock_risk_characteristics",
+    "aggregate_stock_risk_groups",
     "factor_return_shock",
     "causal_rank_ic_state",
     "trailing_return_state",
     "leave_one_out_placebo_adjustment",
+    "assemble_continuous_pseudo_state",
     "measure_continuous_pseudo_convergence",
     "measure_continuous_pseudo_structure",
 ]

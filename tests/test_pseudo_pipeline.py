@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 
 from alpha_crowding.measurement import (
+    assemble_continuous_pseudo_state,
     leave_one_out_placebo_adjustment,
     measure_continuous_pseudo_convergence,
     measure_continuous_pseudo_structure,
@@ -104,6 +105,58 @@ class ContinuousPseudoMeasurementTests(unittest.TestCase):
         self.assertEqual(set(convergence.feature), {"strategy_convergence"})
         self.assertEqual(convergence.original_factor.nunique(), 3)
         self.assertEqual(convergence.pseudo_strategy_id.nunique(), 3)
+
+    def test_state_assembly_uses_the_same_fixed_g_and_s_definitions(self):
+        keys = {
+            "decision_at": [pd.Timestamp("2024-01-05")],
+            "original_factor": ["MOM"],
+            "pseudo_strategy_id": ["p0"],
+            "leg": ["LONG"],
+        }
+        crowding = pd.DataFrame(
+            {
+                **keys,
+                "crowding_state": [0.5],
+                "crowding_state_valid": [True],
+            }
+        )
+        structural = pd.DataFrame(
+            [
+                {
+                    key: values[0] for key, values in keys.items()
+                }
+                | {"feature": feature, "actual_historical_z": value}
+                for feature, value in (
+                    ("residual_sync", 1.0),
+                    ("eigen_concentration", 2.0),
+                )
+            ]
+        )
+        risk = pd.DataFrame(
+            {
+                **keys,
+                "turnover_level_historical_z": [3.0],
+                "illiquidity_level_historical_z": [4.0],
+                "turnover_shock_historical_z": [5.0],
+                "turnover_sync_historical_z": [6.0],
+                "liquidity_shock_historical_z": [7.0],
+            }
+        )
+        return_stress = pd.DataFrame(
+            {
+                **keys,
+                "factor_return_recent": [-0.1],
+                "factor_return_shock": [8.0],
+                "factor_return_history_n": [200],
+            }
+        )
+        state = assemble_continuous_pseudo_state(
+            crowding, structural, risk, return_stress
+        )
+        self.assertAlmostEqual(state.loc[0, "generic_risk"], 2.5)
+        self.assertAlmostEqual(state.loc[0, "stress_trigger"], 6.5)
+        self.assertTrue(state.loc[0, "generic_risk_valid"])
+        self.assertTrue(state.loc[0, "stress_trigger_valid"])
 
 
 if __name__ == "__main__":

@@ -61,6 +61,11 @@ if ($Stage -in @("states", "all")) {
     Invoke-Stage "24_build_state_panel.py" @()
     Invoke-Stage "28_build_model_feature_panel.py" @()
 }
+if ($Stage -eq "all") {
+    Invoke-Stage "33_build_continuous_pseudo_returns.py" @()
+    Invoke-Stage "34_build_continuous_pseudo_crowding.py" @()
+    Invoke-Stage "35_build_continuous_pseudo_state.py" @()
+}
 if ($Stage -in @("outcomes", "all")) {
     Invoke-Stage "25_build_dynamic_outcomes.py" @()
     Invoke-Stage "26_build_fixed_outcomes.py" @()
@@ -73,7 +78,10 @@ if ($Stage -in @("analysis", "all")) {
     Invoke-Stage "31_build_crash_event_study.py" @()
 }
 if ($Stage -in @("falsification", "all")) {
+    if ($Stage -eq "falsification") {
+        Invoke-Stage "33_build_continuous_pseudo_returns.py" @()
+        Invoke-Stage "34_build_continuous_pseudo_crowding.py" @()
+        Invoke-Stage "35_build_continuous_pseudo_state.py" @()
+    }
     Invoke-Stage "32_run_falsification_diagnostics.py" @()
-    Invoke-Stage "33_build_continuous_pseudo_returns.py" @()
-    Invoke-Stage "34_build_continuous_pseudo_crowding.py" @()
 }

@@ -3,7 +3,13 @@ import unittest
 import numpy as np
 import pandas as pd
 
-from alpha_crowding.measurement import factor_return_shock, portfolio_risk_characteristics
+from alpha_crowding.measurement import (
+    aggregate_stock_risk_groups,
+    aggregate_stock_risk_characteristics,
+    factor_return_shock,
+    portfolio_risk_characteristics,
+    stock_risk_characteristics,
+)
 
 
 class PortfolioRiskCharacteristicTests(unittest.TestCase):
@@ -61,6 +67,71 @@ class PortfolioRiskCharacteristicTests(unittest.TestCase):
         self.assertGreater(portfolio["turnover_shock"], 0)
         self.assertGreater(portfolio["liquidity_shock"], 0)
         self.assertEqual(portfolio["turnover_level_coverage"], 1.0)
+
+    def test_cached_stock_inputs_match_direct_portfolio_path(self):
+        calendar = pd.bdate_range("2023-01-02", periods=90)
+        daily = pd.DataFrame(
+            [
+                {
+                    "date": date,
+                    "code": code,
+                    "turn": float(number + 1) * scale,
+                    "daily_illiquidity": float(number + 101) * scale,
+                }
+                for code, scale in (("a", 1.0), ("b", 2.0), ("c", 3.0))
+                for number, date in enumerate(calendar)
+            ]
+        )
+        arguments = {
+            "decision_at": calendar[-1],
+            "turnover_recent_sessions": 5,
+            "turnover_baseline_sessions": 20,
+            "turnover_baseline_minimum": 20,
+            "liquidity_recent_sessions": 10,
+            "liquidity_baseline_sessions": 30,
+            "liquidity_recent_minimum": 10,
+            "liquidity_baseline_minimum": 30,
+        }
+        direct = portfolio_risk_characteristics(
+            daily, ["a", "c"], calendar, **arguments
+        )["portfolio"]
+        cached = stock_risk_characteristics(
+            daily, ["a", "b", "c"], calendar, **arguments
+        )
+        aggregated = aggregate_stock_risk_characteristics(
+            cached, ["a", "c"], decision_at=calendar[-1]
+        )
+        for column in (
+            "turnover_level",
+            "turnover_dispersion",
+            "illiquidity_level",
+            "turnover_shock",
+            "turnover_sync",
+            "liquidity_shock",
+        ):
+            self.assertAlmostEqual(direct[column], aggregated[column])
+
+        memberships = pd.DataFrame(
+            {
+                "portfolio": ["left", "left", "right", "right"],
+                "code": ["a", "c", "a", "b"],
+            }
+        )
+        grouped = aggregate_stock_risk_groups(
+            cached,
+            memberships,
+            group_cols=("portfolio",),
+            decision_at=calendar[-1],
+        ).set_index("portfolio")
+        for column in (
+            "turnover_level",
+            "turnover_dispersion",
+            "illiquidity_level",
+            "turnover_shock",
+            "turnover_sync",
+            "liquidity_shock",
+        ):
+            self.assertAlmostEqual(direct[column], grouped.loc["left", column])
 
 
 if __name__ == "__main__":

@@ -58,15 +58,16 @@ try {
     Invoke-PythonStage "factor_return_stress" "23_build_factor_return_stress.py" @()
     Invoke-PythonStage "state_panel" "24_build_state_panel.py" @()
     Invoke-PythonStage "model_feature_panel" "28_build_model_feature_panel.py" @()
+    Invoke-PythonStage "continuous_pseudo_returns" "33_build_continuous_pseudo_returns.py" @()
+    Invoke-PythonStage "continuous_pseudo_crowding" "34_build_continuous_pseudo_crowding.py" @()
+    Invoke-PythonStage "continuous_pseudo_state" "35_build_continuous_pseudo_state.py" @()
     Invoke-PythonStage "dynamic_outcomes" "25_build_dynamic_outcomes.py" @()
     Invoke-PythonStage "fixed_outcomes" "26_build_fixed_outcomes.py" @()
     Invoke-PythonStage "primary_walk_forward" "29_run_primary_walk_forward.py" @()
     Invoke-PythonStage "lead_time_walk_forward" "30_run_lead_time_walk_forward.py" @()
     Invoke-PythonStage "crash_event_study" "31_build_crash_event_study.py" @()
     Invoke-PythonStage "falsification_diagnostics" "32_run_falsification_diagnostics.py" @()
-    Invoke-PythonStage "continuous_pseudo_returns" "33_build_continuous_pseudo_returns.py" @()
-    Invoke-PythonStage "continuous_pseudo_crowding" "34_build_continuous_pseudo_crowding.py" @()
-    Write-Status "COMPLETE" "continuous_pseudo_crowding" "production P5 and partial P6 completed"
+    Write-Status "COMPLETE" "falsification_diagnostics" "production P5 and partial P6 completed"
 }
 catch {
     Write-Status "FAILED" "pipeline" $_.Exception.Message

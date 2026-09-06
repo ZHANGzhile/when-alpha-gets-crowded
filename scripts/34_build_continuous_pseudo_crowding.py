@@ -200,10 +200,20 @@ def main(*, maximum_dates: int | None) -> int:
         lookback_sessions=int(measurement["historical_window_trading_days"]),
         min_periods=int(measurement["historical_min_weekly_observations"]),
     )
-    features["excess_historical_z"] = standardized["historical_z"]
-    features["excess_history_n"] = standardized["history_n"]
-    features["excess_history_window_start"] = standardized["history_window_start"]
-    features["excess_history_window_end"] = standardized["history_window_end"]
+    actual_standardized = historical_zscore_by_group_trading_window(
+        features,
+        calendar,
+        value_col="actual",
+        group_cols=("original_factor", "pseudo_strategy_id", "leg", "feature"),
+        order_col="decision_at",
+        lookback_sessions=int(measurement["historical_window_trading_days"]),
+        min_periods=int(measurement["historical_min_weekly_observations"]),
+    )
+    for prefix, values in (("excess", standardized), ("actual", actual_standardized)):
+        features[f"{prefix}_historical_z"] = values["historical_z"]
+        features[f"{prefix}_history_n"] = values["history_n"]
+        features[f"{prefix}_history_window_start"] = values["history_window_start"]
+        features[f"{prefix}_history_window_end"] = values["history_window_end"]
     _atomic_parquet(features, FEATURE_OUTPUT)
 
     keys = ["decision_at", "original_factor", "pseudo_strategy_id", "leg"]

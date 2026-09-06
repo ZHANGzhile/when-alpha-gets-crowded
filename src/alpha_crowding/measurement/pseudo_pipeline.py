@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from .convergence import pairwise_jaccard
+from .core import compute_generic_risk, compute_stress_trigger
 from .statistics import industry_residual_returns, shrunk_correlation_features
 
 
@@ -204,3 +205,64 @@ def measure_continuous_pseudo_convergence(
                 }
             )
     return pd.DataFrame(rows)
+
+
+def assemble_continuous_pseudo_state(
+    crowding: pd.DataFrame,
+    structural: pd.DataFrame,
+    risk: pd.DataFrame,
+    return_stress: pd.DataFrame,
+) -> pd.DataFrame:
+    """Join comparable pseudo C/G/S inputs and apply the production aggregators."""
+
+    keys = ["decision_at", "original_factor", "pseudo_strategy_id", "leg"]
+    for name, frame in (
+        ("crowding", crowding),
+        ("risk", risk),
+        ("return_stress", return_stress),
+    ):
+        missing = set(keys) - set(frame.columns)
+        if missing:
+            raise KeyError(f"missing {name} state keys: {sorted(missing)}")
+        if frame.duplicated(keys).any():
+            raise ValueError(f"{name} state keys must be unique")
+    structural_required = {*keys, "feature", "actual_historical_z"}
+    missing = structural_required - set(structural.columns)
+    if missing:
+        raise KeyError(f"missing structural state fields: {sorted(missing)}")
+    if structural.duplicated([*keys, "feature"]).any():
+        raise ValueError("structural state keys must be unique")
+
+    raw = structural.loc[
+        structural["feature"].isin(["residual_sync", "eigen_concentration"])
+    ].pivot(index=keys, columns="feature", values="actual_historical_z").rename(
+        columns={"residual_sync": "raw_sync_z", "eigen_concentration": "raw_eigen_z"}
+    ).reset_index()
+    required_raw = {"raw_sync_z", "raw_eigen_z"}
+    if required_raw - set(raw.columns):
+        raise ValueError("pseudo structural inputs lack raw sync or eigen history")
+    panel = crowding.merge(raw, on=keys, how="outer", validate="one_to_one")
+    panel = panel.merge(risk, on=keys, how="outer", validate="one_to_one")
+    return_columns = keys + [
+        "factor_return_recent",
+        "factor_return_shock",
+        "factor_return_history_n",
+    ]
+    missing_return = set(return_columns) - set(return_stress.columns)
+    if missing_return:
+        raise KeyError(f"missing return-stress fields: {sorted(missing_return)}")
+    panel = panel.merge(
+        return_stress[return_columns],
+        on=keys,
+        how="outer",
+        validate="one_to_one",
+    )
+    panel["turnover_level_z"] = panel["turnover_level_historical_z"]
+    panel["illiquidity_level_z"] = panel["illiquidity_level_historical_z"]
+    panel["turnover_shock_z"] = panel["turnover_shock_historical_z"]
+    panel["turnover_sync_z"] = panel["turnover_sync_historical_z"]
+    panel["liquidity_stress_z"] = panel["liquidity_shock_historical_z"]
+    panel["factor_return_shock_z"] = panel["factor_return_shock"]
+    generic = compute_generic_risk(panel)
+    stress = compute_stress_trigger(panel)
+    return pd.concat([panel, generic, stress], axis=1).sort_values(keys).reset_index(drop=True)

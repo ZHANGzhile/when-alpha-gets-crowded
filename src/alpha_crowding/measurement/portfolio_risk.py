@@ -17,7 +17,7 @@ def _raw_mad_z(current: float, baseline: pd.Series, minimum: int) -> float:
     return float((current - center) / scale)
 
 
-def portfolio_risk_characteristics(
+def stock_risk_characteristics(
     daily: pd.DataFrame,
     actual_codes: list[str],
     trading_calendar: pd.DatetimeIndex,
@@ -27,13 +27,12 @@ def portfolio_risk_characteristics(
     turnover_baseline_sessions: int = 60,
     turnover_recent_minimum: int = 3,
     turnover_baseline_minimum: int = 40,
-    turnover_sync_threshold: float = 1.5,
     liquidity_recent_sessions: int = 20,
     liquidity_baseline_sessions: int = 252,
     liquidity_recent_minimum: int = 15,
     liquidity_baseline_minimum: int = 126,
-) -> dict[str, object]:
-    """Compute G levels and S innovations with non-overlapping baselines."""
+) -> pd.DataFrame:
+    """Compute reusable stock-level G/S inputs with non-overlapping baselines."""
 
     required = {"date", "code", "turn", "daily_illiquidity"}
     missing = required - set(daily.columns)
@@ -116,6 +115,61 @@ def portfolio_risk_characteristics(
             }
         )
     stocks = pd.DataFrame(rows)
+    stocks.insert(0, "decision_at", decision)
+    for name, values in (
+        ("turnover_recent", turn_recent_dates),
+        ("turnover_baseline", turn_baseline_dates),
+        ("liquidity_recent", liquidity_recent_dates),
+        ("liquidity_baseline", liquidity_baseline_dates),
+    ):
+        stocks[f"{name}_start"] = values.min()
+        stocks[f"{name}_end"] = values.max()
+    return stocks
+
+
+def aggregate_stock_risk_characteristics(
+    stock_features: pd.DataFrame,
+    actual_codes: list[str],
+    *,
+    decision_at: object,
+    turnover_sync_threshold: float = 1.5,
+) -> dict[str, object]:
+    """Aggregate cached stock-level risk inputs to one equal-weight portfolio leg."""
+
+    required = {
+        "decision_at",
+        "code",
+        "turnover_level",
+        "turnover_shock",
+        "liquidity_level",
+        "liquidity_shock",
+        "turnover_recent_start",
+        "turnover_recent_end",
+        "turnover_baseline_start",
+        "turnover_baseline_end",
+        "liquidity_recent_start",
+        "liquidity_recent_end",
+        "liquidity_baseline_start",
+        "liquidity_baseline_end",
+    }
+    missing = required - set(stock_features.columns)
+    if missing:
+        raise KeyError(f"missing stock-risk fields: {sorted(missing)}")
+    codes = sorted(set(str(code) for code in actual_codes))
+    if not codes:
+        raise ValueError("actual_codes must not be empty")
+    decision = pd.Timestamp(decision_at).normalize()
+    stocks = stock_features.copy()
+    stocks["decision_at"] = pd.to_datetime(stocks["decision_at"]).dt.normalize()
+    stocks["code"] = stocks["code"].astype(str)
+    stocks = stocks.loc[
+        stocks["decision_at"].eq(decision) & stocks["code"].isin(codes)
+    ]
+    if stocks.duplicated(["decision_at", "code"]).any():
+        raise ValueError("stock risk features must be unique by decision_at/code")
+    missing_codes = set(codes) - set(stocks["code"])
+    if missing_codes:
+        raise ValueError(f"stock risk features lack members: {sorted(missing_codes)[:5]}")
 
     def median(column: str) -> float:
         values = stocks[column].dropna()
@@ -145,16 +199,122 @@ def portfolio_risk_characteristics(
         "turnover_shock_coverage": len(valid_turn_shocks) / len(codes),
         "illiquidity_level_coverage": stocks["liquidity_level"].notna().mean(),
         "liquidity_shock_coverage": len(valid_liquidity_shocks) / len(codes),
-        "turnover_recent_start": turn_recent_dates.min(),
-        "turnover_recent_end": turn_recent_dates.max(),
-        "turnover_baseline_start": turn_baseline_dates.min(),
-        "turnover_baseline_end": turn_baseline_dates.max(),
-        "liquidity_recent_start": liquidity_recent_dates.min(),
-        "liquidity_recent_end": liquidity_recent_dates.max(),
-        "liquidity_baseline_start": liquidity_baseline_dates.min(),
-        "liquidity_baseline_end": liquidity_baseline_dates.max(),
+        "turnover_recent_start": stocks["turnover_recent_start"].iloc[0],
+        "turnover_recent_end": stocks["turnover_recent_end"].iloc[0],
+        "turnover_baseline_start": stocks["turnover_baseline_start"].iloc[0],
+        "turnover_baseline_end": stocks["turnover_baseline_end"].iloc[0],
+        "liquidity_recent_start": stocks["liquidity_recent_start"].iloc[0],
+        "liquidity_recent_end": stocks["liquidity_recent_end"].iloc[0],
+        "liquidity_baseline_start": stocks["liquidity_baseline_start"].iloc[0],
+        "liquidity_baseline_end": stocks["liquidity_baseline_end"].iloc[0],
     }
-    return {"portfolio": result, "stocks": stocks}
+    return result
+
+
+def aggregate_stock_risk_groups(
+    stock_features: pd.DataFrame,
+    memberships: pd.DataFrame,
+    *,
+    group_cols: tuple[str, ...],
+    decision_at: object,
+    turnover_sync_threshold: float = 1.5,
+) -> pd.DataFrame:
+    """Vectorize the same stock-level aggregation across many portfolio legs."""
+
+    required_memberships = {"code", *group_cols}
+    missing = required_memberships - set(memberships.columns)
+    if missing:
+        raise KeyError(f"missing grouped-membership fields: {sorted(missing)}")
+    if memberships.duplicated([*group_cols, "code"]).any():
+        raise ValueError("membership codes must be unique within every portfolio group")
+    decision = pd.Timestamp(decision_at).normalize()
+    stocks = stock_features.copy()
+    stocks["decision_at"] = pd.to_datetime(stocks["decision_at"]).dt.normalize()
+    stocks["code"] = stocks["code"].astype(str)
+    stocks = stocks.loc[stocks["decision_at"].eq(decision)]
+    members = memberships[[*group_cols, "code"]].copy()
+    members["code"] = members["code"].astype(str)
+    joined = members.merge(stocks, on="code", how="left", validate="many_to_one")
+    if joined["decision_at"].isna().any():
+        missing_codes = sorted(joined.loc[joined["decision_at"].isna(), "code"].unique())
+        raise ValueError(f"stock risk features lack members: {missing_codes[:5]}")
+
+    grouped = joined.groupby(list(group_cols), sort=True, dropna=False)
+    result = grouped.agg(
+        member_count=("code", "size"),
+        turnover_level=("turnover_level", "median"),
+        illiquidity_level=("liquidity_level", "median"),
+        turnover_shock=("turnover_shock", "median"),
+        liquidity_shock=("liquidity_shock", "median"),
+        turnover_level_coverage=("turnover_level", lambda values: values.notna().mean()),
+        turnover_shock_coverage=("turnover_shock", lambda values: values.notna().mean()),
+        illiquidity_level_coverage=("liquidity_level", lambda values: values.notna().mean()),
+        liquidity_shock_coverage=("liquidity_shock", lambda values: values.notna().mean()),
+    )
+    result["turnover_dispersion"] = grouped["turnover_level"].apply(
+        lambda values: values.quantile(0.75) - values.quantile(0.25)
+        if values.notna().any()
+        else np.nan
+    )
+    result["turnover_sync"] = grouped["turnover_shock"].apply(
+        lambda values: (values.dropna() > turnover_sync_threshold).mean()
+        if values.notna().any()
+        else np.nan
+    )
+    result["decision_at"] = decision
+    for column in (
+        "turnover_recent_start",
+        "turnover_recent_end",
+        "turnover_baseline_start",
+        "turnover_baseline_end",
+        "liquidity_recent_start",
+        "liquidity_recent_end",
+        "liquidity_baseline_start",
+        "liquidity_baseline_end",
+    ):
+        result[column] = stocks[column].iloc[0]
+    return result.reset_index()
+
+
+def portfolio_risk_characteristics(
+    daily: pd.DataFrame,
+    actual_codes: list[str],
+    trading_calendar: pd.DatetimeIndex,
+    *,
+    decision_at: object,
+    turnover_recent_sessions: int = 5,
+    turnover_baseline_sessions: int = 60,
+    turnover_recent_minimum: int = 3,
+    turnover_baseline_minimum: int = 40,
+    turnover_sync_threshold: float = 1.5,
+    liquidity_recent_sessions: int = 20,
+    liquidity_baseline_sessions: int = 252,
+    liquidity_recent_minimum: int = 15,
+    liquidity_baseline_minimum: int = 126,
+) -> dict[str, object]:
+    """Compute portfolio G/S inputs through the reusable stock-level path."""
+
+    stocks = stock_risk_characteristics(
+        daily,
+        actual_codes,
+        trading_calendar,
+        decision_at=decision_at,
+        turnover_recent_sessions=turnover_recent_sessions,
+        turnover_baseline_sessions=turnover_baseline_sessions,
+        turnover_recent_minimum=turnover_recent_minimum,
+        turnover_baseline_minimum=turnover_baseline_minimum,
+        liquidity_recent_sessions=liquidity_recent_sessions,
+        liquidity_baseline_sessions=liquidity_baseline_sessions,
+        liquidity_recent_minimum=liquidity_recent_minimum,
+        liquidity_baseline_minimum=liquidity_baseline_minimum,
+    )
+    portfolio = aggregate_stock_risk_characteristics(
+        stocks,
+        actual_codes,
+        decision_at=decision_at,
+        turnover_sync_threshold=turnover_sync_threshold,
+    )
+    return {"portfolio": portfolio, "stocks": stocks.drop(columns="decision_at")}
 
 
 def factor_return_shock(
