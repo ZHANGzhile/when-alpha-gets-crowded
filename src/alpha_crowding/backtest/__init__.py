@@ -33,6 +33,7 @@ from .metrics import (
     max_drawdown,
     relative_nav,
     summarize_controller_performance,
+    summarize_crash_episode_losses,
     tracking_error,
 )
 
@@ -58,6 +59,7 @@ __all__ = [
     "relative_nav",
     "risk_percentile_to_active_weight",
     "summarize_controller_performance",
+    "summarize_crash_episode_losses",
     "tracking_error",
     "validate_benchmark_replication_weights",
     "MissingExecutionDataError",

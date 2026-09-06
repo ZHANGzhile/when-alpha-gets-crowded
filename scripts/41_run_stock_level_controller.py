@@ -14,10 +14,12 @@ from alpha_crowding.backtest import (
     build_controller_stock_targets,
     simulate_stock_level_controller,
     summarize_controller_performance,
+    summarize_crash_episode_losses,
     validate_benchmark_replication_weights,
     validate_execution_constraints,
 )
 from alpha_crowding.experiments import require_protocol_freeze
+from alpha_crowding.outcomes import first_threshold_breach_at, merge_crash_episodes
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,11 +32,15 @@ DAILY_MARKET = ROOT / "data" / "interim" / "daily_market"
 CONFIG = ROOT / "config" / "controller.yaml"
 FREEZE_MANIFEST = ROOT / "data" / "raw" / "manifests" / "protocol_freeze.json"
 DAILY_MANIFEST = ROOT / "data" / "raw" / "manifests" / "daily_market.json"
+DYNAMIC_OUTCOMES = ROOT / "data" / "processed" / "dynamic_outcomes.parquet"
+FACTOR_LEG_RETURNS = ROOT / "data" / "processed" / "factor_leg_returns.parquet"
 OUTPUT_DIRECTORY = ROOT / "data" / "results" / "controller"
 TARGET_OUTPUT = OUTPUT_DIRECTORY / "stock_targets.parquet"
 PATH_OUTPUT = OUTPUT_DIRECTORY / "portfolio_paths.parquet"
 LEDGER_OUTPUT = OUTPUT_DIRECTORY / "execution_ledger.parquet"
 METRICS_OUTPUT = OUTPUT_DIRECTORY / "performance_metrics.parquet"
+EPISODES_OUTPUT = OUTPUT_DIRECTORY / "active_crash_episodes.parquet"
+EPISODE_LOSSES_OUTPUT = OUTPUT_DIRECTORY / "crash_episode_losses.parquet"
 MANIFEST = ROOT / "data" / "raw" / "manifests" / "controller_backtest.json"
 
 
@@ -74,6 +80,8 @@ def main() -> int:
         BENCHMARK_INDEX,
         CONSTRAINTS,
         DAILY_MANIFEST,
+        DYNAMIC_OUTCOMES,
+        FACTOR_LEG_RETURNS,
     ):
         if not path.exists():
             raise FileNotFoundError(f"required controller input is missing: {path}")
@@ -132,11 +140,59 @@ def main() -> int:
         benchmark_index,
         execution_ledger,
     )
+    outcomes = pd.read_parquet(DYNAMIC_OUTCOMES)
+    active_events = outcomes.loc[
+        outcomes["target_family"].eq("active_long")
+        & outcomes["membership_mode"].eq("dynamic")
+        & outcomes["horizon_sessions"].eq(20)
+        & outcomes["crash_q10"].fillna(False)
+    ].copy()
+    leg_returns = pd.read_parquet(FACTOR_LEG_RETURNS)
+    leg_returns["date"] = pd.to_datetime(leg_returns["date"]).dt.normalize()
+    benchmark_series = benchmark_index.set_index("date")["daily_return"]
+    calendar = pd.DatetimeIndex(benchmark_index["date"]).sort_values()
+    breach_dates = []
+    for event in active_events.itertuples(index=False):
+        factor_long = leg_returns.loc[
+            leg_returns["factor"].eq(event.factor)
+            & leg_returns["leg"].eq("LONG")
+        ].set_index("date")["daily_return"]
+        breach_dates.append(
+            first_threshold_breach_at(
+                factor_long,
+                calendar,
+                decision_at=event.decision_at,
+                horizon_sessions=int(event.horizon_sessions),
+                threshold=float(event.historical_tail_threshold_q10),
+                benchmark_returns=benchmark_series,
+            )
+        )
+    active_events["breach_at"] = breach_dates
+    active_events["tail_event"] = True
+    active_episodes = merge_crash_episodes(active_events)
+    episode_losses, episode_summary = summarize_crash_episode_losses(
+        portfolio_paths,
+        benchmark_index,
+        active_episodes,
+    )
+    performance_metrics = performance_metrics.merge(
+        episode_summary,
+        on=["factor", "policy", "cost_bps"],
+        how="left",
+        validate="one_to_one",
+    )
+    performance_metrics["crash_episode_count"] = performance_metrics[
+        "crash_episode_count"
+    ].fillna(0).astype(int)
     OUTPUT_DIRECTORY.mkdir(parents=True, exist_ok=True)
     targets.to_parquet(TARGET_OUTPUT, index=False, compression="zstd")
     portfolio_paths.to_parquet(PATH_OUTPUT, index=False, compression="zstd")
     execution_ledger.to_parquet(LEDGER_OUTPUT, index=False, compression="zstd")
     performance_metrics.to_parquet(METRICS_OUTPUT, index=False, compression="zstd")
+    active_episodes.to_parquet(EPISODES_OUTPUT, index=False, compression="zstd")
+    episode_losses.to_parquet(
+        EPISODE_LOSSES_OUTPUT, index=False, compression="zstd"
+    )
     payload = {
         "schema_version": 1,
         "purpose": "stock_level_constrained_controller_backtest",
@@ -150,6 +206,8 @@ def main() -> int:
             "benchmark_index": _sha256(BENCHMARK_INDEX),
             "execution_constraints": _sha256(CONSTRAINTS),
             "daily_market_manifest": _sha256(DAILY_MANIFEST),
+            "dynamic_outcomes": _sha256(DYNAMIC_OUTCOMES),
+            "factor_leg_returns": _sha256(FACTOR_LEG_RETURNS),
             "controller_config": _sha256(CONFIG),
         },
         "policies": policy_columns,
@@ -158,18 +216,24 @@ def main() -> int:
         "portfolio_rows": len(portfolio_paths),
         "ledger_rows": len(execution_ledger),
         "metric_rows": len(performance_metrics),
+        "active_crash_episodes": len(active_episodes),
+        "crash_episode_loss_rows": len(episode_losses),
         "rejected_ledger_rows": int(execution_ledger["reject_reason"].ne("").sum()),
         "outputs": {
             "stock_targets": str(TARGET_OUTPUT.relative_to(ROOT)),
             "portfolio_paths": str(PATH_OUTPUT.relative_to(ROOT)),
             "execution_ledger": str(LEDGER_OUTPUT.relative_to(ROOT)),
             "performance_metrics": str(METRICS_OUTPUT.relative_to(ROOT)),
+            "active_crash_episodes": str(EPISODES_OUTPUT.relative_to(ROOT)),
+            "crash_episode_losses": str(EPISODE_LOSSES_OUTPUT.relative_to(ROOT)),
         },
         "output_sha256": {
             "stock_targets": _sha256(TARGET_OUTPUT),
             "portfolio_paths": _sha256(PATH_OUTPUT),
             "execution_ledger": _sha256(LEDGER_OUTPUT),
             "performance_metrics": _sha256(METRICS_OUTPUT),
+            "active_crash_episodes": _sha256(EPISODES_OUTPUT),
+            "crash_episode_losses": _sha256(EPISODE_LOSSES_OUTPUT),
         },
     }
     MANIFEST.write_text(

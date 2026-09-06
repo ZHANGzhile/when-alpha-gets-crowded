@@ -29,7 +29,7 @@
 - 可交易 CSI 800 复制权重的 PIT 数据契约；只有成分集合或简单等权会在股票级控制器前被拒绝。
 - 股票级控制器执行引擎：成本后目标求解、每日持仓漂移、现金、买卖方向开盘限制、实际成交成本和逐证券拒单账本。
 - 开盘调仓的正确收益归属：旧持仓承担隔夜收益，成交后的目标持仓承担日内收益，两段连乘重建收盘到收盘收益。
-- P7绝对与相对CSI 800指标，包括Sharpe、Sortino、MDD、最差20日、Tracking Error、Information Ratio、Active MDD/CVaR、暴露、换手和拒单。
+- P7绝对与相对CSI 800指标，包括Sharpe、Sortino、MDD、最差20日、Tracking Error、Information Ratio、Active MDD/CVaR、Active目标Crash Episode Loss、暴露、换手和拒单。
 - 协议哈希门：P0 数据门未关闭时，不允许生成确认期结果。
 
 完整困难、判断过程和解决办法记录在

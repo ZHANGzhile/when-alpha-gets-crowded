@@ -21,6 +21,7 @@ from alpha_crowding.backtest import (
     risk_percentile_to_active_weight,
     simulate_stock_level_controller,
     summarize_controller_performance,
+    summarize_crash_episode_losses,
     validate_benchmark_replication_weights,
     validate_execution_constraints,
 )
@@ -445,6 +446,41 @@ class RelativePerformanceTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "aligned benchmark"):
             summarize_controller_performance(paths, benchmark.iloc[:-1], ledger)
+
+    def test_active_crash_episode_losses_use_complete_oos_intervals(self):
+        dates = pd.bdate_range("2024-01-02", periods=4)
+        paths = pd.DataFrame(
+            {
+                "date": dates,
+                "factor": "MOM",
+                "policy": "M3",
+                "cost_bps": 10.0,
+                "net_return": [0.0, 0.10, -0.10, 0.0],
+            }
+        )
+        benchmark = pd.DataFrame({"date": dates, "daily_return": [0.0] * 4})
+        episodes = pd.DataFrame(
+            {
+                "factor": ["MOM", "MOM"],
+                "episode_id": ["inside", "outside"],
+                "interval_start_at": [dates[1], dates[0] - pd.Timedelta(days=1)],
+                "interval_end_at": [dates[2], dates[0]],
+            }
+        )
+        losses, summary = summarize_crash_episode_losses(
+            paths,
+            benchmark,
+            episodes,
+        )
+        self.assertEqual(losses["episode_id"].tolist(), ["inside"])
+        self.assertAlmostEqual(losses.loc[0, "portfolio_episode_return"], -0.01)
+        self.assertAlmostEqual(losses.loc[0, "active_episode_return"], -0.01)
+        self.assertAlmostEqual(losses.loc[0, "portfolio_episode_mdd"], 0.10)
+        self.assertEqual(summary.loc[0, "crash_episode_count"], 1)
+
+        incomplete = paths.drop(index=2)
+        with self.assertRaisesRegex(ValueError, "incomplete"):
+            summarize_crash_episode_losses(incomplete, benchmark, episodes.iloc[:1])
 
     def test_relative_nav_is_wealth_ratio_not_compounded_active_difference(self):
         factor = [0.10, -0.10]

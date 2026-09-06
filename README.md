@@ -40,7 +40,8 @@ State, Factor State, `G`, and `S` are already included.
 - Correct opening-rebalance return attribution: old holdings receive overnight returns, executed
   targets receive intraday returns, and the two legs reconstruct close-to-close returns.
 - Absolute and CSI 800-relative P7 metrics, including Sharpe, Sortino, MDD, worst 20-session
-  return, tracking error, information ratio, Active MDD/CVaR, exposure, turnover, and rejections.
+  return, tracking error, information ratio, Active MDD/CVaR, Active-target crash episode loss,
+  exposure, turnover, and rejections.
 - A protocol hash gate that blocks confirmatory outcomes until the P0 data gates are closed.
 
 The implementation rationale and problem log are in

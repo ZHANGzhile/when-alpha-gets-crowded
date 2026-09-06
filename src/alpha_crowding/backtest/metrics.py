@@ -329,3 +329,117 @@ def summarize_controller_performance(
             }
         )
     return pd.DataFrame(rows).sort_values(group_key).reset_index(drop=True)
+
+
+def summarize_crash_episode_losses(
+    portfolio_paths: pd.DataFrame,
+    benchmark_returns: pd.DataFrame,
+    episodes: pd.DataFrame,
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Measure complete Active-target crash episodes inside each OOS path."""
+
+    path_required = {"date", "factor", "policy", "cost_bps", "net_return"}
+    benchmark_required = {"date", "daily_return"}
+    episode_required = {
+        "factor",
+        "episode_id",
+        "interval_start_at",
+        "interval_end_at",
+    }
+    for name, frame, required in (
+        ("portfolio path", portfolio_paths, path_required),
+        ("benchmark", benchmark_returns, benchmark_required),
+        ("episode", episodes, episode_required),
+    ):
+        missing = required - set(frame.columns)
+        if missing:
+            raise KeyError(f"missing {name} fields: {sorted(missing)}")
+    paths = portfolio_paths.copy()
+    paths["date"] = pd.to_datetime(paths["date"], errors="raise").dt.normalize()
+    benchmark = benchmark_returns[["date", "daily_return"]].copy()
+    benchmark["date"] = pd.to_datetime(
+        benchmark["date"], errors="raise"
+    ).dt.normalize()
+    if benchmark["date"].duplicated().any():
+        raise ValueError("benchmark returns contain duplicate dates")
+    benchmark = benchmark.set_index("date")["daily_return"]
+    events = episodes.copy()
+    for column in ("interval_start_at", "interval_end_at"):
+        events[column] = pd.to_datetime(events[column], errors="raise").dt.normalize()
+    if events.duplicated(["factor", "episode_id"]).any():
+        raise ValueError("episodes must be unique by factor/episode_id")
+    if (events["interval_end_at"] < events["interval_start_at"]).any():
+        raise ValueError("episode end precedes its start")
+
+    rows = []
+    group_key = ["factor", "policy", "cost_bps"]
+    for keys, group in paths.groupby(group_key, sort=True):
+        factor, policy, cost_bps = keys
+        ordered = group.sort_values("date").set_index("date")
+        first_date = ordered.index.min()
+        last_date = ordered.index.max()
+        factor_events = events.loc[events["factor"].eq(factor)]
+        for event in factor_events.itertuples(index=False):
+            start = event.interval_start_at
+            end = event.interval_end_at
+            if start < first_date or end > last_date:
+                continue
+            dates = benchmark.index[benchmark.index.to_series().between(start, end)]
+            if len(dates) == 0:
+                raise ValueError("crash episode contains no benchmark sessions")
+            portfolio = ordered["net_return"].reindex(dates)
+            benchmark_window = benchmark.reindex(dates)
+            if portfolio.isna().any() or benchmark_window.isna().any():
+                raise ValueError("crash episode is incomplete inside an OOS path")
+            portfolio_values = tuple(float(value) for value in portfolio)
+            benchmark_values = tuple(float(value) for value in benchmark_window)
+            portfolio_nav = [1.0]
+            benchmark_nav = [1.0]
+            for portfolio_return, benchmark_return in zip(
+                portfolio_values, benchmark_values
+            ):
+                portfolio_nav.append(portfolio_nav[-1] * (1.0 + portfolio_return))
+                benchmark_nav.append(benchmark_nav[-1] * (1.0 + benchmark_return))
+            relative_path = relative_nav(portfolio_values, benchmark_values)
+            rows.append(
+                {
+                    "factor": factor,
+                    "policy": policy,
+                    "cost_bps": cost_bps,
+                    "episode_id": event.episode_id,
+                    "interval_start_at": start,
+                    "interval_end_at": end,
+                    "observations": len(dates),
+                    "portfolio_episode_return": portfolio_nav[-1] - 1.0,
+                    "benchmark_episode_return": benchmark_nav[-1] - 1.0,
+                    "active_episode_return": relative_path[-1] - 1.0,
+                    "portfolio_episode_mdd": max_drawdown(portfolio_nav),
+                    "active_episode_mdd": max_drawdown(relative_path),
+                }
+            )
+    episode_losses = pd.DataFrame(rows)
+    summary_columns = [
+        *group_key,
+        "crash_episode_count",
+        "mean_portfolio_episode_return",
+        "worst_portfolio_episode_return",
+        "mean_active_episode_return",
+        "worst_active_episode_return",
+        "worst_portfolio_episode_mdd",
+        "worst_active_episode_mdd",
+    ]
+    if episode_losses.empty:
+        return episode_losses, pd.DataFrame(columns=summary_columns)
+    grouped = episode_losses.groupby(group_key, sort=True)
+    summary = grouped.agg(
+        crash_episode_count=("episode_id", "nunique"),
+        mean_portfolio_episode_return=("portfolio_episode_return", "mean"),
+        worst_portfolio_episode_return=("portfolio_episode_return", "min"),
+        mean_active_episode_return=("active_episode_return", "mean"),
+        worst_active_episode_return=("active_episode_return", "min"),
+        worst_portfolio_episode_mdd=("portfolio_episode_mdd", "max"),
+        worst_active_episode_mdd=("active_episode_mdd", "max"),
+    ).reset_index()
+    return episode_losses.sort_values(
+        [*group_key, "interval_start_at"]
+    ).reset_index(drop=True), summary[summary_columns]
