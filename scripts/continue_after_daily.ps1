@@ -56,33 +56,62 @@ function Start-DailyRecovery {
 try {
     Write-Status "WAITING" "daily" "waiting for complete universe daily download"
     $staleRestarts = 0
-    if (Test-Path -LiteralPath $dailyPidPath) {
-        while ($true) {
+    while ($true) {
+        $dailyPid = $null
+        $dailyProcess = $null
+        if (Test-Path -LiteralPath $dailyPidPath) {
             $dailyPid = [int](Get-Content -LiteralPath $dailyPidPath -Raw)
             $dailyProcess = Get-Process -Id $dailyPid -ErrorAction SilentlyContinue
-            if ($null -eq $dailyProcess) {
+        }
+        if ($null -eq $dailyProcess) {
+            $dailyStatus = $null
+            if (Test-Path -LiteralPath $dailyManifestPath) {
+                $dailyStatus = (
+                    Get-Content -LiteralPath $dailyManifestPath -Raw |
+                        ConvertFrom-Json
+                ).status
+            }
+            if ($dailyStatus -eq "COMPLETE") {
                 break
             }
-            if (Test-Path -LiteralPath $dailyManifestPath) {
-                $lastProgress = (Get-Item -LiteralPath $dailyManifestPath).LastWriteTimeUtc
-                $progressAge = [DateTime]::UtcNow - $lastProgress
-                if ($progressAge -ge $staleThreshold) {
-                    if ($staleRestarts -ge $maximumStaleRestarts) {
-                        throw "daily download remained stale after $staleRestarts restarts"
-                    }
-                    $staleRestarts += 1
-                    Write-Status `
-                        "RUNNING" `
-                        "daily_recovery" `
-                        "stale worker pid=$dailyPid; restart $staleRestarts"
-                    Stop-Process -Id $dailyPid -Force
-                    Start-Sleep -Seconds 2
-                    $dailyProcess = Start-DailyRecovery
-                    continue
-                }
+            if ($staleRestarts -ge $maximumStaleRestarts) {
+                throw "daily download exited after $staleRestarts recovery attempts"
             }
-            Start-Sleep -Seconds $pollSeconds
+            $staleRestarts += 1
+            Write-Status `
+                "RUNNING" `
+                "daily_recovery" `
+                "worker exited with status=$dailyStatus; restart $staleRestarts"
+            $dailyProcess = Start-DailyRecovery
+            Start-Sleep -Seconds 5
+            continue
         }
+        $lastProgress = $dailyProcess.StartTime.ToUniversalTime()
+        if (Test-Path -LiteralPath $dailyManifestPath) {
+            $manifestUpdated = (
+                Get-Item -LiteralPath $dailyManifestPath
+            ).LastWriteTimeUtc
+            if ($manifestUpdated -gt $lastProgress) {
+                $lastProgress = $manifestUpdated
+            }
+        }
+        $progressAge = [DateTime]::UtcNow - $lastProgress
+        if ($progressAge -ge $staleThreshold) {
+            if ($staleRestarts -ge $maximumStaleRestarts) {
+                throw "daily download remained stale after $staleRestarts restarts"
+            }
+            $staleRestarts += 1
+            Write-Status `
+                "RUNNING" `
+                "daily_recovery" `
+                "stale worker pid=$dailyPid; restart $staleRestarts"
+            Stop-Process -Id $dailyPid -Force
+            Start-Sleep -Seconds 2
+            $dailyProcess = Start-DailyRecovery
+            Start-Sleep -Seconds 5
+            continue
+        }
+        Start-Sleep -Seconds $pollSeconds
     }
     $dailyManifest = Get-Content -LiteralPath $dailyManifestPath -Raw | ConvertFrom-Json
     if ($dailyManifest.status -ne "COMPLETE") {
