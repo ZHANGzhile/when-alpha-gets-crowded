@@ -331,6 +331,119 @@ def summarize_controller_performance(
     return pd.DataFrame(rows).sort_values(group_key).reset_index(drop=True)
 
 
+def summarize_benchmark_replication_quality(
+    portfolio_paths: pd.DataFrame,
+    benchmark_returns: pd.DataFrame,
+    execution_ledger: pd.DataFrame,
+    *,
+    policy: str = "active_weight_benchmark",
+) -> pd.DataFrame:
+    """Separate executable benchmark replication error from transaction costs."""
+
+    selected_paths = portfolio_paths.loc[portfolio_paths["policy"].eq(policy)].copy()
+    selected_ledger = execution_ledger.loc[
+        execution_ledger["policy"].eq(policy)
+    ].copy()
+    if selected_paths.empty:
+        raise ValueError(f"portfolio paths lack benchmark policy {policy!r}")
+    if selected_ledger.empty:
+        raise ValueError(f"execution ledger lacks benchmark policy {policy!r}")
+    if selected_paths["active_weight"].abs().gt(1e-12).any():
+        raise ValueError("benchmark replication policy must have zero active weight")
+    if "gross_return" not in selected_paths:
+        raise KeyError("benchmark replication paths lack gross_return")
+
+    net = summarize_controller_performance(
+        selected_paths,
+        benchmark_returns,
+        selected_ledger,
+    )
+    relative_fields = (
+        "relative_total_return",
+        "annualized_relative_return",
+        "tracking_error",
+        "information_ratio",
+        "active_max_drawdown",
+        "active_cvar",
+    )
+    net = net.rename(columns={name: f"net_{name}" for name in relative_fields})
+    benchmark = benchmark_returns[["date", "daily_return"]].copy()
+    benchmark["date"] = pd.to_datetime(
+        benchmark["date"], errors="raise"
+    ).dt.normalize()
+    if benchmark["date"].duplicated().any():
+        raise ValueError("benchmark returns contain duplicate dates")
+
+    gross_rows = []
+    group_key = ["factor", "policy", "cost_bps"]
+    for keys, group in selected_paths.groupby(group_key, sort=True):
+        aligned = group.merge(benchmark, on="date", how="left", validate="one_to_one")
+        if aligned["daily_return"].isna().any():
+            raise ValueError("benchmark replication lacks aligned index returns")
+        gross = evaluate_relative_performance(
+            aligned["gross_return"], aligned["daily_return"]
+        )
+        values = asdict(gross)
+        gross_rows.append(
+            {
+                "factor": keys[0],
+                "policy": keys[1],
+                "cost_bps": keys[2],
+                **{
+                    f"gross_{name}": value
+                    for name, value in values.items()
+                    if name != "observations"
+                },
+            }
+        )
+    gross_frame = pd.DataFrame(gross_rows)
+    return net.merge(gross_frame, on=group_key, how="left", validate="one_to_one")
+
+
+def assess_benchmark_replication_quality(
+    quality: pd.DataFrame,
+    *,
+    maximum_gross_tracking_error: float,
+    maximum_net_tracking_error: float,
+    maximum_absolute_gross_annualized_relative_return: float,
+) -> tuple[pd.DataFrame, bool]:
+    """Apply immutable, pre-specified acceptance limits to a replication report."""
+
+    required = {
+        "gross_tracking_error",
+        "net_tracking_error",
+        "gross_annualized_relative_return",
+    }
+    missing = required - set(quality.columns)
+    if missing:
+        raise KeyError(f"replication quality lacks fields: {sorted(missing)}")
+    thresholds = {
+        "maximum_gross_tracking_error": float(maximum_gross_tracking_error),
+        "maximum_net_tracking_error": float(maximum_net_tracking_error),
+        "maximum_absolute_gross_annualized_relative_return": float(
+            maximum_absolute_gross_annualized_relative_return
+        ),
+    }
+    if any(not isfinite(value) or value < 0.0 for value in thresholds.values()):
+        raise ValueError("replication quality thresholds must be finite and non-negative")
+    result = quality.copy()
+    result["passes_gross_tracking_error"] = result[
+        "gross_tracking_error"
+    ].le(thresholds["maximum_gross_tracking_error"])
+    result["passes_net_tracking_error"] = result["net_tracking_error"].le(
+        thresholds["maximum_net_tracking_error"]
+    )
+    result["passes_gross_active_return"] = result[
+        "gross_annualized_relative_return"
+    ].abs().le(thresholds["maximum_absolute_gross_annualized_relative_return"])
+    audit_columns = [
+        "passes_gross_tracking_error",
+        "passes_net_tracking_error",
+        "passes_gross_active_return",
+    ]
+    return result, bool(result[audit_columns].all().all())
+
+
 def summarize_crash_episode_losses(
     portfolio_paths: pd.DataFrame,
     benchmark_returns: pd.DataFrame,

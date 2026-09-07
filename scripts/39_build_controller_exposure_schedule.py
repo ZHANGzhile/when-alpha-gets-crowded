@@ -70,6 +70,7 @@ def main() -> int:
         bands=tiers,
     )
     schedule["active_weight_full"] = 1.0
+    schedule["active_weight_benchmark"] = 0.0
     minimum = float(config["sensitivity_policy"]["minimum_active_weight"])
     for model in models:
         schedule[f"active_weight_{model}_probability_sensitivity"] = schedule[

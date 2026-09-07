@@ -196,7 +196,7 @@ def main(
     policy_columns = [
         column
         for column in schedule.columns
-        if column == "active_weight_full" or column.startswith("active_weight_M")
+        if column.startswith("active_weight_")
     ]
     targets = build_controller_stock_targets(
         schedule,

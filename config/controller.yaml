@@ -26,3 +26,7 @@ reference_data:
   opening_limit_available_time: "09:00:00 Asia/Shanghai"
   execution_time: "09:30:00 Asia/Shanghai"
   required_minimum_points: 2000
+benchmark_replication_audit:
+  maximum_gross_tracking_error: 0.01
+  maximum_net_tracking_error: 0.02
+  maximum_absolute_gross_annualized_relative_return: 0.01

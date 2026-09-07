@@ -11,8 +11,10 @@ import pandas as pd
 import yaml
 
 from alpha_crowding.backtest import (
+    assess_benchmark_replication_quality,
     build_controller_stock_targets,
     simulate_stock_level_controller,
+    summarize_benchmark_replication_quality,
     summarize_controller_performance,
     summarize_crash_episode_losses,
     validate_benchmark_replication_weights,
@@ -39,9 +41,13 @@ TARGET_OUTPUT = OUTPUT_DIRECTORY / "stock_targets.parquet"
 PATH_OUTPUT = OUTPUT_DIRECTORY / "portfolio_paths.parquet"
 LEDGER_OUTPUT = OUTPUT_DIRECTORY / "execution_ledger.parquet"
 METRICS_OUTPUT = OUTPUT_DIRECTORY / "performance_metrics.parquet"
+REPLICATION_OUTPUT = OUTPUT_DIRECTORY / "benchmark_replication_quality.parquet"
 EPISODES_OUTPUT = OUTPUT_DIRECTORY / "active_crash_episodes.parquet"
 EPISODE_LOSSES_OUTPUT = OUTPUT_DIRECTORY / "crash_episode_losses.parquet"
 MANIFEST = ROOT / "data" / "raw" / "manifests" / "controller_backtest.json"
+REPLICATION_MANIFEST = (
+    ROOT / "data" / "raw" / "manifests" / "benchmark_replication_quality.json"
+)
 
 
 def _sha256(path: Path) -> str:
@@ -97,7 +103,7 @@ def main() -> int:
     policy_columns = [
         column
         for column in schedule.columns
-        if column == "active_weight_full" or column.startswith("active_weight_M")
+        if column.startswith("active_weight_")
     ]
     targets = build_controller_stock_targets(
         schedule,
@@ -140,6 +146,40 @@ def main() -> int:
         benchmark_index,
         execution_ledger,
     )
+    replication_quality = summarize_benchmark_replication_quality(
+        portfolio_paths,
+        benchmark_index,
+        execution_ledger,
+    )
+    audit = config["benchmark_replication_audit"]
+    replication_quality, replication_accepted = assess_benchmark_replication_quality(
+        replication_quality,
+        **audit,
+    )
+    OUTPUT_DIRECTORY.mkdir(parents=True, exist_ok=True)
+    replication_quality.to_parquet(
+        REPLICATION_OUTPUT, index=False, compression="zstd"
+    )
+    replication_payload = {
+        "schema_version": 1,
+        "purpose": "executable_csi800_replication_quality_gate",
+        "status": "ACCEPTED" if replication_accepted else "REJECTED",
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "thresholds": audit,
+        "rows": len(replication_quality),
+        "output": str(REPLICATION_OUTPUT.relative_to(ROOT)),
+        "output_sha256": _sha256(REPLICATION_OUTPUT),
+    }
+    REPLICATION_MANIFEST.parent.mkdir(parents=True, exist_ok=True)
+    REPLICATION_MANIFEST.write_text(
+        json.dumps(replication_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    if not replication_accepted:
+        raise ValueError(
+            "executable CSI800 replication failed its pre-specified quality gate; "
+            f"inspect {REPLICATION_OUTPUT}"
+        )
     outcomes = pd.read_parquet(DYNAMIC_OUTCOMES)
     active_events = outcomes.loc[
         outcomes["target_family"].eq("active_long")
@@ -184,7 +224,6 @@ def main() -> int:
     performance_metrics["crash_episode_count"] = performance_metrics[
         "crash_episode_count"
     ].fillna(0).astype(int)
-    OUTPUT_DIRECTORY.mkdir(parents=True, exist_ok=True)
     targets.to_parquet(TARGET_OUTPUT, index=False, compression="zstd")
     portfolio_paths.to_parquet(PATH_OUTPUT, index=False, compression="zstd")
     execution_ledger.to_parquet(LEDGER_OUTPUT, index=False, compression="zstd")
@@ -216,6 +255,7 @@ def main() -> int:
         "portfolio_rows": len(portfolio_paths),
         "ledger_rows": len(execution_ledger),
         "metric_rows": len(performance_metrics),
+        "benchmark_replication_quality_rows": len(replication_quality),
         "active_crash_episodes": len(active_episodes),
         "crash_episode_loss_rows": len(episode_losses),
         "rejected_ledger_rows": int(execution_ledger["reject_reason"].ne("").sum()),
@@ -224,6 +264,9 @@ def main() -> int:
             "portfolio_paths": str(PATH_OUTPUT.relative_to(ROOT)),
             "execution_ledger": str(LEDGER_OUTPUT.relative_to(ROOT)),
             "performance_metrics": str(METRICS_OUTPUT.relative_to(ROOT)),
+            "benchmark_replication_quality": str(
+                REPLICATION_OUTPUT.relative_to(ROOT)
+            ),
             "active_crash_episodes": str(EPISODES_OUTPUT.relative_to(ROOT)),
             "crash_episode_losses": str(EPISODE_LOSSES_OUTPUT.relative_to(ROOT)),
         },
@@ -232,6 +275,7 @@ def main() -> int:
             "portfolio_paths": _sha256(PATH_OUTPUT),
             "execution_ledger": _sha256(LEDGER_OUTPUT),
             "performance_metrics": _sha256(METRICS_OUTPUT),
+            "benchmark_replication_quality": _sha256(REPLICATION_OUTPUT),
             "active_crash_episodes": _sha256(EPISODES_OUTPUT),
             "crash_episode_losses": _sha256(EPISODE_LOSSES_OUTPUT),
         },

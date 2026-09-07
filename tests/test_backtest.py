@@ -7,6 +7,7 @@ from alpha_crowding.backtest import (
     MissingExecutionDataError,
     active_weights_from_oos_probabilities,
     arithmetic_active_returns,
+    assess_benchmark_replication_quality,
     build_oos_exposure_schedule,
     build_open_tradeability,
     build_controller_stock_targets,
@@ -22,6 +23,7 @@ from alpha_crowding.backtest import (
     relative_nav,
     risk_percentile_to_active_weight,
     simulate_stock_level_controller,
+    summarize_benchmark_replication_quality,
     summarize_controller_performance,
     summarize_crash_episode_losses,
     validate_benchmark_replication_weights,
@@ -225,6 +227,7 @@ class StockAccountingTests(unittest.TestCase):
                 "factor": ["MOM"],
                 "active_weight_M2": [0.5],
                 "active_weight_M3": [0.25],
+                "active_weight_benchmark": [0.0],
             }
         )
         memberships = pd.DataFrame(
@@ -247,7 +250,11 @@ class StockAccountingTests(unittest.TestCase):
             schedule,
             memberships,
             benchmark,
-            policy_columns=("active_weight_M2", "active_weight_M3"),
+            policy_columns=(
+                "active_weight_M2",
+                "active_weight_M3",
+                "active_weight_benchmark",
+            ),
         )
         sums = result.groupby("policy")["target_weight"].sum()
         self.assertTrue((sums == 1.0).all())
@@ -255,6 +262,12 @@ class StockAccountingTests(unittest.TestCase):
         self.assertAlmostEqual(m2.loc["A", "target_weight"], 0.25)
         self.assertAlmostEqual(m2.loc["B", "target_weight"], 0.45)
         self.assertAlmostEqual(m2.loc["C", "target_weight"], 0.30)
+        replica = result.loc[
+            result["policy"].eq("active_weight_benchmark")
+        ].set_index("code")
+        self.assertAlmostEqual(replica.get("target_weight").get("B"), 0.4)
+        self.assertAlmostEqual(replica.get("target_weight").get("C"), 0.6)
+        self.assertNotIn("A", replica.index)
 
     def test_execution_charges_only_actual_trades_and_keeps_blocked_holding(self):
         targets = pd.DataFrame(
@@ -506,6 +519,63 @@ class RelativePerformanceTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "aligned benchmark"):
             summarize_controller_performance(paths, benchmark.iloc[:-1], ledger)
+
+    def test_benchmark_replication_audit_separates_gross_and_net_error(self):
+        dates = pd.bdate_range("2024-01-02", periods=20)
+        benchmark_returns = [0.001, -0.001] * 10
+        paths = pd.DataFrame(
+            {
+                "date": dates,
+                "factor": "MOM",
+                "policy": "active_weight_benchmark",
+                "cost_bps": 10.0,
+                "gross_return": benchmark_returns,
+                "net_return": [benchmark_returns[0] - 0.001]
+                + benchmark_returns[1:],
+                "active_weight": 0.0,
+                "half_l1_turnover": [0.5] + [0.0] * 19,
+                "transaction_cost": [0.001] + [0.0] * 19,
+            }
+        )
+        benchmark = pd.DataFrame(
+            {"date": dates, "daily_return": benchmark_returns}
+        )
+        ledger = pd.DataFrame(
+            {
+                "factor": ["MOM"],
+                "policy": ["active_weight_benchmark"],
+                "cost_bps": [10.0],
+                "reject_reason": [""],
+            }
+        )
+        quality = summarize_benchmark_replication_quality(
+            paths, benchmark, ledger
+        ).iloc[0]
+        self.assertAlmostEqual(quality["gross_tracking_error"], 0.0)
+        self.assertGreater(quality["net_tracking_error"], 0.0)
+        self.assertEqual(quality["mean_active_weight"], 0.0)
+        assessed, accepted = assess_benchmark_replication_quality(
+            pd.DataFrame(
+                {
+                    "gross_tracking_error": [0.01, 0.011],
+                    "net_tracking_error": [0.02, 0.019],
+                    "gross_annualized_relative_return": [0.01, -0.009],
+                }
+            ),
+            maximum_gross_tracking_error=0.01,
+            maximum_net_tracking_error=0.02,
+            maximum_absolute_gross_annualized_relative_return=0.01,
+        )
+        self.assertFalse(accepted)
+        self.assertTrue(assessed.loc[0].filter(like="passes_").all())
+        self.assertFalse(assessed.loc[1, "passes_gross_tracking_error"])
+
+        contaminated = paths.copy()
+        contaminated.loc[0, "active_weight"] = 0.1
+        with self.assertRaisesRegex(ValueError, "zero active weight"):
+            summarize_benchmark_replication_quality(
+                contaminated, benchmark, ledger
+            )
 
     def test_active_crash_episode_losses_use_complete_oos_intervals(self):
         dates = pd.bdate_range("2024-01-02", periods=4)

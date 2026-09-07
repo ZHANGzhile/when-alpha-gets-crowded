@@ -35,6 +35,9 @@ State, Factor State, `G`, and `S` are already included.
   and next-session activation.
 - A point-in-time contract for tradable CSI 800 replication weights; membership-only and
   equal-weight substitutes are rejected before stock-level controller accounting.
+- A zero-active-weight executable CSI 800 control that uses the same opening constraints and
+  cost engine, audits gross/net tracking error and gross active-return bias, and stops production
+  when its pre-specified quality limits fail.
 - A stock-level controller engine with post-cost target solving, daily holding drift, cash,
   side-specific opening constraints, actual-trade costs, and a per-security rejection ledger.
 - Correct opening-rebalance return attribution: old holdings receive overnight returns, executed
@@ -63,9 +66,9 @@ work in progress because several gates are open:
   placebo path. Each of 100 pseudo-strategies has stable memberships, return ledgers,
   leave-one-out structural C, comparable G/S and factor states, identity-specific mature LS
   outcomes, and an independently tuned annual OOS M2/M3 comparison.
-- The controller exposure schedule, benchmark data gate, and constrained stock-level accounting
-  engine are implemented. Production P7 remains blocked until point-in-time tradable CSI 800
-  replication weights and timestamped opening tradeability observations are supplied and accepted.
+- The controller exposure schedule, benchmark data gate, pure-replication quality gate, and
+  constrained stock-level accounting engine are implemented. Production P7 remains blocked until
+  the Tushare reference inputs pass their real-data acceptance checks.
   The fixed-low-exposure and volatility-control comparator parameters also remain protocol-freeze
   decisions.
 
