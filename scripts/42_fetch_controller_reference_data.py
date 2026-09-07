@@ -158,6 +158,12 @@ def main(
         f"active_weight_{model}" for model in config["information_models"]
     ]
     schedule = schedule.loc[schedule[primary_columns].notna().all(axis=1)].copy()
+    policy_columns = [
+        column
+        for column in schedule.columns
+        if column.startswith("active_weight_")
+    ]
+    schedule = schedule.loc[schedule[policy_columns].notna().all(axis=1)].copy()
     if schedule.empty:
         raise ValueError("controller schedule has no common executable OOS rows")
     client = create_tushare_client()
@@ -193,11 +199,6 @@ def main(
     )
     _atomic_parquet(benchmark, BENCHMARK_OUTPUT)
 
-    policy_columns = [
-        column
-        for column in schedule.columns
-        if column.startswith("active_weight_")
-    ]
     targets = build_controller_stock_targets(
         schedule,
         pd.read_parquet(MEMBERSHIPS),

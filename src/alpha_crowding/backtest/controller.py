@@ -8,7 +8,7 @@ audit.
 
 from __future__ import annotations
 
-from math import isfinite
+from math import isfinite, sqrt
 from typing import Iterable, Optional, Sequence, Tuple
 
 import pandas as pd
@@ -148,6 +148,107 @@ def probability_to_active_weight(
     if lower > upper:
         raise ValueError("minimum_weight must not exceed maximum_weight")
     return min(upper, max(lower, 1.0 - risk))
+
+
+def build_volatility_control_weights(
+    decisions: pd.DataFrame,
+    active_returns: pd.DataFrame,
+    *,
+    lookback_sessions: int,
+    minimum_observations: int,
+    annualized_target_volatility: float,
+    minimum_active_weight: float = 0.25,
+    maximum_active_weight: float = 1.0,
+    periods_per_year: int = 252,
+) -> pd.DataFrame:
+    """Build close-known volatility-control weights from trailing active returns."""
+
+    decision_required = {"decision_at", "factor"}
+    return_required = {"date", "factor", "active_return"}
+    for name, frame, required in (
+        ("decision", decisions, decision_required),
+        ("active return", active_returns, return_required),
+    ):
+        missing = required - set(frame.columns)
+        if missing:
+            raise KeyError(f"missing {name} fields: {sorted(missing)}")
+    if (
+        isinstance(lookback_sessions, bool)
+        or isinstance(minimum_observations, bool)
+        or lookback_sessions < 2
+        or minimum_observations < 2
+        or minimum_observations > lookback_sessions
+    ):
+        raise ValueError("volatility window and minimum observations are invalid")
+    if isinstance(periods_per_year, bool) or periods_per_year < 1:
+        raise ValueError("periods_per_year must be positive")
+    target = float(annualized_target_volatility)
+    lower = _as_probability(minimum_active_weight, name="minimum_active_weight")
+    upper = _as_probability(maximum_active_weight, name="maximum_active_weight")
+    if not isfinite(target) or target <= 0.0:
+        raise ValueError("annualized_target_volatility must be finite and positive")
+    if lower > upper:
+        raise ValueError("minimum_active_weight must not exceed maximum_active_weight")
+
+    dates = decisions[["decision_at", "factor"]].copy()
+    dates["decision_at"] = pd.to_datetime(
+        dates["decision_at"], errors="raise"
+    ).dt.normalize()
+    dates["factor"] = dates["factor"].astype(str)
+    if dates.duplicated(["decision_at", "factor"]).any():
+        raise ValueError("decisions must be unique by date/factor")
+    returns = active_returns[["date", "factor", "active_return"]].copy()
+    returns["date"] = pd.to_datetime(returns["date"], errors="raise").dt.normalize()
+    returns["factor"] = returns["factor"].astype(str)
+    returns["active_return"] = pd.to_numeric(
+        returns["active_return"], errors="coerce"
+    )
+    if returns.duplicated(["date", "factor"]).any():
+        raise ValueError("active returns must be unique by date/factor")
+    histories = {
+        factor: group.sort_values("date").reset_index(drop=True)
+        for factor, group in returns.groupby("factor", sort=False)
+    }
+    rows = []
+    for current in dates.itertuples(index=False):
+        history = histories.get(current.factor)
+        if history is None:
+            window = pd.DataFrame(columns=returns.columns)
+        else:
+            window = history.loc[history["date"].le(current.decision_at)].tail(
+                lookback_sessions
+            )
+        complete = (
+            len(window) >= minimum_observations
+            and window["active_return"].notna().all()
+        )
+        if complete:
+            volatility = float(window["active_return"].std(ddof=1)) * sqrt(
+                periods_per_year
+            )
+            weight = upper if volatility == 0.0 else target / volatility
+            weight = min(upper, max(lower, weight))
+        else:
+            volatility = None
+            weight = None
+        rows.append(
+            {
+                "decision_at": current.decision_at,
+                "factor": current.factor,
+                "active_weight_volatility_control": weight,
+                "volatility_control_estimate": volatility,
+                "volatility_control_observations": len(window),
+                "volatility_control_window_start": (
+                    window["date"].min() if len(window) else pd.NaT
+                ),
+                "volatility_control_window_end": (
+                    window["date"].max() if len(window) else pd.NaT
+                ),
+            }
+        )
+    return pd.DataFrame(rows).sort_values(
+        ["decision_at", "factor"]
+    ).reset_index(drop=True)
 
 
 def build_oos_exposure_schedule(

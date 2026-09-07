@@ -12,6 +12,17 @@ primary_policy:
 sensitivity_policy:
   type: clipped_one_minus_probability
   minimum_active_weight: 0.25
+fixed_low_exposure:
+  active_weight: 0.825
+  rationale: ex_ante_expected_weight_of_primary_percentile_tiers
+volatility_control:
+  return_series: factor_long_minus_csi800
+  lookback_sessions: 60
+  minimum_observations: 40
+  annualized_target_volatility: 0.10
+  minimum_active_weight: 0.25
+  maximum_active_weight: 1.00
+  periods_per_year: 252
 cost_bps:
   primary: 10
   sensitivity: [5, 20]

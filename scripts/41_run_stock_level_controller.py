@@ -105,6 +105,7 @@ def main() -> int:
         for column in schedule.columns
         if column.startswith("active_weight_")
     ]
+    schedule = schedule.loc[schedule[policy_columns].notna().all(axis=1)].copy()
     targets = build_controller_stock_targets(
         schedule,
         memberships,

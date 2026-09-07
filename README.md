@@ -67,10 +67,9 @@ work in progress because several gates are open:
   leave-one-out structural C, comparable G/S and factor states, identity-specific mature LS
   outcomes, and an independently tuned annual OOS M2/M3 comparison.
 - The controller exposure schedule, benchmark data gate, pure-replication quality gate, and
-  constrained stock-level accounting engine are implemented. Production P7 remains blocked until
-  the Tushare reference inputs pass their real-data acceptance checks.
-  The fixed-low-exposure and volatility-control comparator parameters also remain protocol-freeze
-  decisions.
+  constrained stock-level accounting engine are implemented, including pre-specified fixed-low
+  and trailing-volatility comparators. Production P7 remains blocked until the Tushare reference
+  inputs pass their real-data acceptance checks.
 
 Raw data, generated manifests, logs, model outputs, local reports, and source PDFs are excluded from
 Git. The repository contains reproducible code, configuration candidates, and audit notes.

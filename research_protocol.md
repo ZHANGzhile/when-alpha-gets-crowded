@@ -129,6 +129,11 @@ shows stable out-of-sample value.
 The confirmatory controller uses historical OOS risk-percentile tiers with active weights
 1.00/0.75/0.50/0.25 at the 60/80/90/100 percentile boundaries. Comparators are full active,
 fixed lower active, volatility control, M2, M3, and M4. All use identical execution delay and costs.
+The fixed-lower comparator has active weight 0.825, the ex-ante expected exposure of the tier rule
+under uniform historical risk percentiles. Volatility control estimates annualized volatility from
+the latest 60 Factor Long-minus-CSI800 daily returns known by the decision close, requires at least
+40 complete observations, targets 10% annualized volatility, and clips active weight to [0.25, 1].
+Its weight becomes effective only at the next session open.
 
 Primary application metric: net Information Ratio at 10bp single-side cost. Active MDD and Active
 CVaR must not worsen. Five and 20bp are sensitivity assumptions. Application success is judged
@@ -158,4 +163,3 @@ and effective calendar blocks rather than treating factor-week rows as independe
 - [ ] Common sample-mask and interval-purge tests pass.
 - [ ] Full-pipeline placebo identity and audit tables specified.
 - [ ] Protocol hash generated and status changed to FROZEN before confirmatory outcomes are viewed.
-

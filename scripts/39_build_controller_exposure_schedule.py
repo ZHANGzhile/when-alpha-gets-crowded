@@ -12,6 +12,7 @@ import yaml
 
 from alpha_crowding.backtest import (
     build_oos_exposure_schedule,
+    build_volatility_control_weights,
     probability_to_active_weight,
 )
 from alpha_crowding.experiments import require_protocol_freeze
@@ -19,6 +20,8 @@ from alpha_crowding.experiments import require_protocol_freeze
 
 ROOT = Path(__file__).resolve().parents[1]
 PREDICTIONS = ROOT / "data" / "models" / "primary_walk_forward_predictions.parquet"
+FACTOR_LEG_RETURNS = ROOT / "data" / "processed" / "factor_leg_returns.parquet"
+BENCHMARK = ROOT / "data" / "raw" / "benchmark" / "csi800.parquet"
 CONFIG = ROOT / "config" / "controller.yaml"
 OUTPUT = ROOT / "data" / "processed" / "controller_exposure_schedule.parquet"
 MANIFEST = ROOT / "data" / "raw" / "manifests" / "controller_exposure_schedule.json"
@@ -47,6 +50,9 @@ def _calendar() -> pd.DatetimeIndex:
 
 def main() -> int:
     require_protocol_freeze(FREEZE_MANIFEST, ROOT)
+    for path in (PREDICTIONS, FACTOR_LEG_RETURNS, BENCHMARK, CONFIG):
+        if not path.exists():
+            raise FileNotFoundError(f"required controller input is missing: {path}")
     prediction_manifest = json.loads(PREDICTION_MANIFEST.read_text(encoding="utf-8"))
     if prediction_manifest.get("status") != "COMPLETE":
         raise ValueError("controller requires a COMPLETE primary prediction manifest")
@@ -71,6 +77,46 @@ def main() -> int:
     )
     schedule["active_weight_full"] = 1.0
     schedule["active_weight_benchmark"] = 0.0
+    schedule["active_weight_fixed_low"] = float(
+        config["fixed_low_exposure"]["active_weight"]
+    )
+    leg_returns = pd.read_parquet(FACTOR_LEG_RETURNS)
+    factor_long = leg_returns.loc[
+        leg_returns["leg"].eq("LONG"), ["date", "factor", "daily_return"]
+    ].copy()
+    benchmark = pd.read_parquet(BENCHMARK, columns=["date", "daily_return"])
+    for frame in (factor_long, benchmark):
+        frame["date"] = pd.to_datetime(frame["date"], errors="raise").dt.normalize()
+    active_returns = factor_long.merge(
+        benchmark.rename(columns={"daily_return": "benchmark_return"}),
+        on="date",
+        how="left",
+        validate="many_to_one",
+    )
+    if active_returns["benchmark_return"].isna().any():
+        raise ValueError("factor-long history lacks aligned CSI800 returns")
+    active_returns["active_return"] = (
+        active_returns["daily_return"] - active_returns["benchmark_return"]
+    )
+    volatility_config = config["volatility_control"]
+    volatility = build_volatility_control_weights(
+        schedule[["decision_at", "factor"]],
+        active_returns[["date", "factor", "active_return"]],
+        lookback_sessions=int(volatility_config["lookback_sessions"]),
+        minimum_observations=int(volatility_config["minimum_observations"]),
+        annualized_target_volatility=float(
+            volatility_config["annualized_target_volatility"]
+        ),
+        minimum_active_weight=float(volatility_config["minimum_active_weight"]),
+        maximum_active_weight=float(volatility_config["maximum_active_weight"]),
+        periods_per_year=int(volatility_config["periods_per_year"]),
+    )
+    schedule = schedule.merge(
+        volatility,
+        on=["decision_at", "factor"],
+        how="left",
+        validate="one_to_one",
+    )
     minimum = float(config["sensitivity_policy"]["minimum_active_weight"])
     for model in models:
         schedule[f"active_weight_{model}_probability_sensitivity"] = schedule[
@@ -86,9 +132,13 @@ def main() -> int:
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
         "protocol_freeze_sha256": _sha256(FREEZE_MANIFEST),
         "prediction_sha256": _sha256(PREDICTIONS),
+        "factor_leg_returns_sha256": _sha256(FACTOR_LEG_RETURNS),
+        "benchmark_sha256": _sha256(BENCHMARK),
         "rows": len(schedule),
         "models": models,
         "minimum_history_weeks": int(config["primary_policy"]["minimum_history_weeks"]),
+        "fixed_low_exposure": config["fixed_low_exposure"],
+        "volatility_control": config["volatility_control"],
         "warmup_rows": int(schedule[primary_weight_columns].isna().any(axis=1).sum()),
         "first_executable_date": (
             str(

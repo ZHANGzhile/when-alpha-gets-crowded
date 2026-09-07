@@ -12,6 +12,7 @@ from alpha_crowding.backtest import (
     build_open_tradeability,
     build_controller_stock_targets,
     build_drifted_benchmark_weights,
+    build_volatility_control_weights,
     calculate_rebalance,
     combine_stock_target_weights,
     drift_weights,
@@ -95,6 +96,48 @@ class ControllerPolicyTests(unittest.TestCase):
         self.assertEqual(current.loc["A", "effective_at"], calendar[12])
         warmup = result["decision_at"].isin(dates[:2])
         self.assertTrue(result.loc[warmup, "active_weight_M2"].isna().all())
+
+    def test_volatility_control_uses_only_returns_known_by_decision_close(self):
+        return_dates = pd.bdate_range("2024-01-02", periods=5)
+        active = pd.DataFrame(
+            {
+                "date": return_dates,
+                "factor": "MOM",
+                "active_return": [0.0, 0.10, 0.0, 0.10, 0.90],
+            }
+        )
+        decisions = pd.DataFrame(
+            {"decision_at": [return_dates[3]], "factor": ["MOM"]}
+        )
+        result = build_volatility_control_weights(
+            decisions,
+            active,
+            lookback_sessions=4,
+            minimum_observations=4,
+            annualized_target_volatility=0.10,
+            periods_per_year=4,
+        ).iloc[0]
+        expected_volatility = pd.Series([0.0, 0.10, 0.0, 0.10]).std() * 2.0
+        self.assertAlmostEqual(
+            result["volatility_control_estimate"], expected_volatility
+        )
+        self.assertAlmostEqual(
+            result["active_weight_volatility_control"],
+            0.10 / expected_volatility,
+        )
+        self.assertEqual(result["volatility_control_window_end"], return_dates[3])
+        without_future = build_volatility_control_weights(
+            decisions,
+            active.iloc[:-1],
+            lookback_sessions=4,
+            minimum_observations=4,
+            annualized_target_volatility=0.10,
+            periods_per_year=4,
+        ).iloc[0]
+        self.assertEqual(
+            result["active_weight_volatility_control"],
+            without_future["active_weight_volatility_control"],
+        )
 
     def test_benchmark_contract_enforces_pit_and_full_investment(self):
         valid = pd.DataFrame(

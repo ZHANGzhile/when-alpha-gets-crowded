@@ -349,13 +349,15 @@ Discriminant validity 不使用全样本残差化来制造独立性。描述性�
 比较六类组合：
 
 1. 满主动暴露；
-2. 开发期确定的固定低主动暴露；
-3. 波动率控制；
+2. 固定低主动暴露`w=0.825`，等于主分位层级在均匀风险分位下的事前期望暴露；
+3. 波动率控制：截至决策日收盘的最近60个交易日Active Long日收益，至少40项，年化目标10%，`w=clip(0.10/σ,0.25,1.00)`；
 4. M2 一般风险控制；
 5. M3 拥挤感知控制；
 6. M4 拥挤×压力控制。
 
 核心经济比较是 M3/M4 控制器对 M2。另给出与测试期实际平均暴露相同的事后固定暴露诊断，但明确其不可事前执行。
+
+固定低暴露与波动率控制都在下一交易日开盘生效，并使用与M2/M3/M4相同的股票目标、成交限制和成本路径。波动率只读取决策时已经实现的Factor Long减CSI800日收益；不足40项或窗口内缺失时不生成仓位，下游共同样本门会停止而不会补值。
 
 应用主指标冻结为10bp成本后的净 Information Ratio；同时要求 Active MDD 与 Active CVaR 不恶化，并完整报告 Annual Return、Vol、Sharpe、Sortino、MDD、Worst20d、Active Return、Tracking Error、Information Ratio、Active MDD、Crash Episode Loss、平均/分布主动暴露与换手。5/20bp为敏感性。
 
