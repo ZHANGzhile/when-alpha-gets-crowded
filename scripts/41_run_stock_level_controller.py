@@ -11,6 +11,7 @@ import pandas as pd
 import yaml
 
 from alpha_crowding.backtest import (
+    add_expost_mean_exposure_diagnostic,
     assess_benchmark_replication_quality,
     build_controller_stock_targets,
     simulate_stock_level_controller,
@@ -97,6 +98,7 @@ def main() -> int:
         f"active_weight_{model}" for model in config["information_models"]
     ]
     schedule = schedule.loc[schedule[primary_columns].notna().all(axis=1)].copy()
+    schedule = add_expost_mean_exposure_diagnostic(schedule)
     memberships = pd.read_parquet(MEMBERSHIPS)
     benchmark = validate_benchmark_replication_weights(pd.read_parquet(BENCHMARK))
     constraints = validate_execution_constraints(pd.read_parquet(CONSTRAINTS))
@@ -147,6 +149,13 @@ def main() -> int:
         benchmark_index,
         execution_ledger,
     )
+    performance_metrics["policy_role"] = "ex_ante_strategy"
+    diagnostic_policy = "active_weight_M3_expost_mean"
+    diagnostic_mask = performance_metrics["policy"].eq(diagnostic_policy)
+    performance_metrics.loc[diagnostic_mask, "policy_role"] = (
+        "ex_post_mean_exposure_diagnostic"
+    )
+    performance_metrics["ex_ante_executable"] = ~diagnostic_mask
     replication_quality = summarize_benchmark_replication_quality(
         portfolio_paths,
         benchmark_index,
@@ -251,6 +260,14 @@ def main() -> int:
             "controller_config": _sha256(CONFIG),
         },
         "policies": policy_columns,
+        "policy_roles": {
+            policy: (
+                "ex_post_mean_exposure_diagnostic"
+                if policy == diagnostic_policy
+                else "ex_ante_strategy"
+            )
+            for policy in policy_columns
+        },
         "cost_bps": costs,
         "stock_target_rows": len(targets),
         "portfolio_rows": len(portfolio_paths),

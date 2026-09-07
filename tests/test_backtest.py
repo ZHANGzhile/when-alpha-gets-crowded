@@ -6,6 +6,7 @@ import pandas as pd
 from alpha_crowding.backtest import (
     MissingExecutionDataError,
     active_weights_from_oos_probabilities,
+    add_expost_mean_exposure_diagnostic,
     arithmetic_active_returns,
     assess_benchmark_replication_quality,
     build_oos_exposure_schedule,
@@ -138,6 +139,24 @@ class ControllerPolicyTests(unittest.TestCase):
             result["active_weight_volatility_control"],
             without_future["active_weight_volatility_control"],
         )
+
+    def test_expost_mean_exposure_is_constant_within_factor_and_labeled(self):
+        schedule = pd.DataFrame(
+            {
+                "decision_at": pd.bdate_range("2024-01-02", periods=4),
+                "factor": ["A", "A", "B", "B"],
+                "active_weight_M3": [1.0, 0.5, 0.25, 0.75],
+            }
+        )
+        result = add_expost_mean_exposure_diagnostic(schedule)
+        self.assertEqual(
+            result["active_weight_M3_expost_mean"].tolist(),
+            [0.75, 0.75, 0.5, 0.5],
+        )
+        with self.assertRaisesRegex(ValueError, "complete common sample"):
+            add_expost_mean_exposure_diagnostic(
+                schedule.assign(active_weight_M3=[1.0, None, 0.25, 0.75])
+            )
 
     def test_benchmark_contract_enforces_pit_and_full_investment(self):
         valid = pd.DataFrame(

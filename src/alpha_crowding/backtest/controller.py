@@ -251,6 +251,32 @@ def build_volatility_control_weights(
     ).reset_index(drop=True)
 
 
+def add_expost_mean_exposure_diagnostic(
+    schedule: pd.DataFrame,
+    *,
+    source_column: str = "active_weight_M3",
+    output_column: str = "active_weight_M3_expost_mean",
+) -> pd.DataFrame:
+    """Add an explicitly non-executable full-period mean-exposure diagnostic."""
+
+    required = {"decision_at", "factor", source_column}
+    missing = required - set(schedule.columns)
+    if missing:
+        raise KeyError(f"ex-post exposure diagnostic lacks fields: {sorted(missing)}")
+    if output_column in schedule.columns:
+        raise ValueError(f"output column already exists: {output_column}")
+    result = schedule.copy()
+    result[source_column] = pd.to_numeric(result[source_column], errors="coerce")
+    if result[source_column].isna().any():
+        raise ValueError("ex-post exposure diagnostic requires a complete common sample")
+    if not result[source_column].between(0.0, 1.0).all():
+        raise ValueError("source exposure must be in [0, 1]")
+    result[output_column] = result.groupby("factor", sort=False)[
+        source_column
+    ].transform("mean")
+    return result
+
+
 def build_oos_exposure_schedule(
     predictions: pd.DataFrame,
     trading_calendar: pd.DatetimeIndex,

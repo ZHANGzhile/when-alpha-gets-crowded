@@ -14,6 +14,7 @@ from .benchmark import (
 from .controller import (
     DEFAULT_RISK_BANDS,
     active_weights_from_oos_probabilities,
+    add_expost_mean_exposure_diagnostic,
     build_oos_exposure_schedule,
     build_volatility_control_weights,
     historical_risk_percentile,
@@ -52,6 +53,7 @@ __all__ = [
     "active_cvar",
     "assess_benchmark_replication_quality",
     "active_weights_from_oos_probabilities",
+    "add_expost_mean_exposure_diagnostic",
     "build_oos_exposure_schedule",
     "build_volatility_control_weights",
     "arithmetic_active_returns",

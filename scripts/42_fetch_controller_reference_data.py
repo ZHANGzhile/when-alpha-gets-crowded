@@ -14,6 +14,7 @@ import pandas as pd
 import yaml
 
 from alpha_crowding.backtest import (
+    add_expost_mean_exposure_diagnostic,
     build_controller_stock_targets,
     build_drifted_benchmark_weights,
     build_open_tradeability,
@@ -158,6 +159,7 @@ def main(
         f"active_weight_{model}" for model in config["information_models"]
     ]
     schedule = schedule.loc[schedule[primary_columns].notna().all(axis=1)].copy()
+    schedule = add_expost_mean_exposure_diagnostic(schedule)
     policy_columns = [
         column
         for column in schedule.columns

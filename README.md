@@ -45,6 +45,8 @@ State, Factor State, `G`, and `S` are already included.
 - Absolute and CSI 800-relative P7 metrics, including Sharpe, Sortino, MDD, worst 20-session
   return, tracking error, information ratio, Active MDD/CVaR, Active-target crash episode loss,
   exposure, turnover, and rejections.
+- An explicitly non-executable, ex-post constant exposure matched to each factor's realized M3
+  mean, used only to distinguish timing value from average de-risking.
 - A protocol hash gate that blocks confirmatory outcomes until the P0 data gates are closed.
 
 The implementation rationale and problem log are in
