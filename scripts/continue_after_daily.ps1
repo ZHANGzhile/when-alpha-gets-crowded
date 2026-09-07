@@ -67,7 +67,10 @@ try {
             $dailyStatus = $null
             if (Test-Path -LiteralPath $dailyManifestPath) {
                 $dailyStatus = (
-                    Get-Content -LiteralPath $dailyManifestPath -Raw |
+                    Get-Content `
+                        -LiteralPath $dailyManifestPath `
+                        -Raw `
+                        -Encoding utf8 |
                         ConvertFrom-Json
                 ).status
             }
@@ -113,7 +116,11 @@ try {
         }
         Start-Sleep -Seconds $pollSeconds
     }
-    $dailyManifest = Get-Content -LiteralPath $dailyManifestPath -Raw | ConvertFrom-Json
+    $dailyManifest = Get-Content `
+        -LiteralPath $dailyManifestPath `
+        -Raw `
+        -Encoding utf8 |
+        ConvertFrom-Json
     if ($dailyManifest.status -ne "COMPLETE") {
         throw "daily download ended with status $($dailyManifest.status)"
     }
