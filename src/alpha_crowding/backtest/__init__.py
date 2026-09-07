@@ -7,7 +7,10 @@ from .accounting import (
     drift_weights,
     rebalance_after_drift,
 )
-from .benchmark import validate_benchmark_replication_weights
+from .benchmark import (
+    build_drifted_benchmark_weights,
+    validate_benchmark_replication_weights,
+)
 from .controller import (
     DEFAULT_RISK_BANDS,
     active_weights_from_oos_probabilities,
@@ -18,6 +21,7 @@ from .controller import (
 )
 from .execution import (
     MissingExecutionDataError,
+    build_open_tradeability,
     build_controller_stock_targets,
     simulate_stock_level_controller,
     validate_execution_constraints,
@@ -62,7 +66,9 @@ __all__ = [
     "summarize_crash_episode_losses",
     "tracking_error",
     "validate_benchmark_replication_weights",
+    "build_drifted_benchmark_weights",
     "MissingExecutionDataError",
+    "build_open_tradeability",
     "build_controller_stock_targets",
     "simulate_stock_level_controller",
     "validate_execution_constraints",

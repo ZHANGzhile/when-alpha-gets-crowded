@@ -33,7 +33,9 @@ SOURCE_MANIFEST = ROOT / "data" / "raw" / "manifests" / "daily_download.json"
 OUTPUT_COLUMNS = [
     "date",
     "code",
+    "open",
     "close",
+    "preclose",
     "daily_return",
     "overnight_return",
     "intraday_return",

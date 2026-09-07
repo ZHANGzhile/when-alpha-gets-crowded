@@ -70,6 +70,90 @@ def validate_execution_constraints(constraints: pd.DataFrame) -> pd.DataFrame:
     return result.sort_values(["date", "code"]).reset_index(drop=True)
 
 
+def build_open_tradeability(
+    daily_open: pd.DataFrame,
+    daily_limits: pd.DataFrame,
+    *,
+    source_available_time: str = "09:00:00",
+    execution_time: str = "09:30:00",
+    market_timezone: str = "Asia/Shanghai",
+    price_tolerance: float = 1e-8,
+) -> pd.DataFrame:
+    """Create conservative side-specific opening constraints from PIT limit prices."""
+
+    open_required = ["date", "code", "open", "tradestatus"]
+    limit_required = ["date", "code", "up_limit", "down_limit"]
+    for name, frame, required in (
+        ("daily open", daily_open, open_required),
+        ("daily limit", daily_limits, limit_required),
+    ):
+        missing = set(required) - set(frame.columns)
+        if missing:
+            raise KeyError(f"missing {name} fields: {sorted(missing)}")
+    market = _normalized_dates(daily_open[open_required], ["date"])
+    limits = _normalized_dates(daily_limits[limit_required], ["date"])
+    for frame in (market, limits):
+        frame["code"] = frame["code"].astype(str)
+    if market.duplicated(["date", "code"]).any():
+        raise ValueError("daily open rows contain duplicate keys")
+    if limits.duplicated(["date", "code"]).any():
+        raise ValueError("daily limit rows contain duplicate keys")
+    market["open"] = pd.to_numeric(market["open"], errors="coerce")
+    market["tradestatus"] = pd.to_numeric(
+        market["tradestatus"], errors="raise"
+    ).astype(int)
+    if not market["tradestatus"].isin([0, 1]).all():
+        raise ValueError("tradestatus must be binary")
+    for column in ("up_limit", "down_limit"):
+        limits[column] = pd.to_numeric(limits[column], errors="coerce")
+    joined = market.merge(limits, on=["date", "code"], how="left", validate="one_to_one")
+    traded = joined["tradestatus"].eq(1)
+    invalid_traded = traded & (
+        joined[["open", "up_limit", "down_limit"]].isna().any(axis=1)
+        | (joined["open"] <= 0.0)
+        | (joined["down_limit"] <= 0.0)
+        | (joined["up_limit"] <= joined["down_limit"])
+    )
+    if invalid_traded.any():
+        examples = joined.loc[invalid_traded, ["date", "code"]].head()
+        raise ValueError(
+            "tradable securities lack valid opening limit data: "
+            f"{examples.to_dict('records')}"
+        )
+    joined["can_buy"] = traded & (
+        joined["open"] < joined["up_limit"] - price_tolerance
+    )
+    joined["can_sell"] = traded & (
+        joined["open"] > joined["down_limit"] + price_tolerance
+    )
+    joined["reason"] = ""
+    joined.loc[~traded, "reason"] = "suspended"
+    joined.loc[traded & ~joined["can_buy"], "reason"] = "open_at_upper_limit"
+    joined.loc[traded & ~joined["can_sell"], "reason"] = "open_at_lower_limit"
+    date_text = joined["date"].dt.strftime("%Y-%m-%d")
+    joined["available_at"] = pd.to_datetime(
+        date_text + " " + source_available_time,
+        errors="raise",
+    ).dt.tz_localize(market_timezone).dt.tz_convert("UTC")
+    joined["execution_at"] = pd.to_datetime(
+        date_text + " " + execution_time,
+        errors="raise",
+    ).dt.tz_localize(market_timezone).dt.tz_convert("UTC")
+    return validate_execution_constraints(
+        joined[
+            [
+                "date",
+                "execution_at",
+                "available_at",
+                "code",
+                "can_buy",
+                "can_sell",
+                "reason",
+            ]
+        ]
+    )
+
+
 def build_controller_stock_targets(
     exposure_schedule: pd.DataFrame,
     factor_memberships: pd.DataFrame,

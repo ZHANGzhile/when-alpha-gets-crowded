@@ -61,6 +61,15 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
+P7参考数据下载器使用可选的Tushare客户端：
+
+```powershell
+python -m pip install -e ".[controller-data]"
+$env:TUSHARE_TOKEN = "仅保存在本机环境中的token"
+```
+
+token只从进程环境读取，不会写入仓库文件或运行清单。账户需要拥有`index_weight`和`stk_limit`接口权限。
+
 如果 Python 位于其他目录，可在使用 PowerShell 脚本前把环境变量 `ALPHA_CROWDING_PYTHON` 指向对应可执行文件。
 
 ## 验证

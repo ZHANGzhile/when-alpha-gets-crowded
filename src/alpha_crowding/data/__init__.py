@@ -34,6 +34,13 @@ from .membership import (
 )
 from .normalize import add_lagged_matching_characteristics, normalize_baostock_daily
 from .asof import join_industry_asof
+from .tushare_source import (
+    TushareQueryError,
+    create_tushare_client,
+    fetch_csi800_weights,
+    fetch_daily_stock_limits,
+    tushare_code_to_internal,
+)
 
 __all__ = [
     "AvailabilityViolation",
@@ -61,4 +68,9 @@ __all__ = [
     "normalize_baostock_daily",
     "add_lagged_matching_characteristics",
     "join_industry_asof",
+    "TushareQueryError",
+    "create_tushare_client",
+    "fetch_csi800_weights",
+    "fetch_daily_stock_limits",
+    "tushare_code_to_internal",
 ]

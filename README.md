@@ -83,6 +83,16 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
+The P7 reference-data downloader uses the optional Tushare client:
+
+```powershell
+python -m pip install -e ".[controller-data]"
+$env:TUSHARE_TOKEN = "your-local-token"
+```
+
+The token stays in the process environment and is never written to repository files or manifests.
+The account needs access to the `index_weight` and `stk_limit` endpoints.
+
 If Python lives elsewhere, set `ALPHA_CROWDING_PYTHON` to its executable before using the
 PowerShell helpers.
 

@@ -8,7 +8,9 @@ from alpha_crowding.backtest import (
     active_weights_from_oos_probabilities,
     arithmetic_active_returns,
     build_oos_exposure_schedule,
+    build_open_tradeability,
     build_controller_stock_targets,
+    build_drifted_benchmark_weights,
     calculate_rebalance,
     combine_stock_target_weights,
     drift_weights,
@@ -111,6 +113,35 @@ class ControllerPolicyTests(unittest.TestCase):
         incomplete.loc[0, "weight"] = 0.3
         with self.assertRaisesRegex(ValueError, "sum to one"):
             validate_benchmark_replication_weights(incomplete)
+
+    def test_monthly_benchmark_anchor_drifts_to_weekly_decision(self):
+        anchors = pd.DataFrame(
+            {
+                "weight_date": ["2024-01-02", "2024-01-02"],
+                "available_at": ["2024-01-02", "2024-01-02"],
+                "code": ["A", "B"],
+                "weight": [0.5, 0.5],
+            }
+        )
+        returns = pd.DataFrame(
+            {
+                "date": ["2024-01-03", "2024-01-03"],
+                "code": ["A", "B"],
+                "daily_return": [0.10, 0.0],
+            }
+        )
+        result = build_drifted_benchmark_weights(
+            anchors,
+            returns,
+            pd.DatetimeIndex(["2024-01-02", "2024-01-03"]),
+        )
+        first = result.loc[result["decision_at"].eq(pd.Timestamp("2024-01-02"))]
+        second = result.loc[result["decision_at"].eq(pd.Timestamp("2024-01-03"))]
+        self.assertAlmostEqual(first.set_index("code").loc["A", "weight"], 0.5)
+        self.assertAlmostEqual(
+            second.set_index("code").loc["A", "weight"],
+            0.55 / 1.05,
+        )
 
 
 class StockAccountingTests(unittest.TestCase):
@@ -341,6 +372,35 @@ class StockAccountingTests(unittest.TestCase):
                 valid,
                 one_way_cost_bps=10,
             )
+
+    def test_open_tradeability_is_side_specific_and_preopen(self):
+        daily = pd.DataFrame(
+            {
+                "date": ["2024-01-02"] * 4,
+                "code": ["normal", "upper", "lower", "halted"],
+                "open": [10.0, 11.0, 9.0, None],
+                "tradestatus": [1, 1, 1, 0],
+            }
+        )
+        limits = pd.DataFrame(
+            {
+                "date": ["2024-01-02"] * 3,
+                "code": ["normal", "upper", "lower"],
+                "up_limit": [11.0, 11.0, 11.0],
+                "down_limit": [9.0, 9.0, 9.0],
+            }
+        )
+        result = build_open_tradeability(daily, limits).set_index("code")
+        self.assertTrue(result.loc["normal", "can_buy"])
+        self.assertTrue(result.loc["normal", "can_sell"])
+        self.assertFalse(result.loc["upper", "can_buy"])
+        self.assertTrue(result.loc["upper", "can_sell"])
+        self.assertTrue(result.loc["lower", "can_buy"])
+        self.assertFalse(result.loc["lower", "can_sell"])
+        self.assertEqual(result.loc["halted", "reason"], "suspended")
+        self.assertTrue(
+            (result["available_at"] <= result["execution_at"]).all()
+        )
 
     def test_open_rebalance_assigns_overnight_return_to_old_holding(self):
         targets = pd.DataFrame(

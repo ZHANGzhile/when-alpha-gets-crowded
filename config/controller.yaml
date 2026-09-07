@@ -17,3 +17,12 @@ cost_bps:
   sensitivity: [5, 20]
 primary_application_metric: net_information_ratio
 guardrails: [active_mdd_not_worse, active_cvar_not_worse]
+reference_data:
+  provider: tushare_pro
+  benchmark_index_code: 000906.SH
+  benchmark_weight_endpoint: index_weight
+  benchmark_anchor_frequency: monthly
+  opening_limit_endpoint: stk_limit
+  opening_limit_available_time: "09:00:00 Asia/Shanghai"
+  execution_time: "09:30:00 Asia/Shanghai"
+  required_minimum_points: 2000

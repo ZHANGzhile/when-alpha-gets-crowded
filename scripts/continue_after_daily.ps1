@@ -71,6 +71,7 @@ try {
     Invoke-PythonStage "crash_event_study" "31_build_crash_event_study.py" @()
     Invoke-PythonStage "falsification_diagnostics" "32_run_falsification_diagnostics.py" @()
     Invoke-PythonStage "controller_exposure_schedule" "39_build_controller_exposure_schedule.py" @()
+    Invoke-PythonStage "controller_reference_data" "42_fetch_controller_reference_data.py" @()
     Invoke-PythonStage "benchmark_replication_gate" "40_validate_benchmark_replication.py" @()
     Invoke-PythonStage "stock_level_controller" "41_run_stock_level_controller.py" @()
     Write-Status "COMPLETE" "stock_level_controller" "stock-level controller paths completed"
