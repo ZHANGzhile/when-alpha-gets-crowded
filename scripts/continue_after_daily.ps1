@@ -5,7 +5,11 @@ $pythonPath = Resolve-AlphaCrowdingPython $workspacePath
 $manifestDirectory = Join-Path $workspacePath "data\raw\manifests"
 $dailyPidPath = Join-Path $manifestDirectory "daily_download.pid"
 $statusPath = Join-Path $manifestDirectory "production_supervisor.json"
+$dailyManifestPath = Join-Path $manifestDirectory "daily_download.json"
 $env:PYTHONPATH = "$workspacePath\.python-packages;$workspacePath\src"
+$staleThreshold = [TimeSpan]::FromMinutes(20)
+$maximumStaleRestarts = 3
+$pollSeconds = 30
 
 function Write-Status([string]$status, [string]$stage, [string]$message) {
     $payload = [ordered]@{
@@ -29,16 +33,58 @@ function Invoke-PythonStage([string]$name, [string]$script, [string[]]$arguments
     Write-Status "RUNNING" $name "completed $script"
 }
 
+function Start-DailyRecovery {
+    $runStamp = [DateTimeOffset]::UtcNow.ToString("yyyyMMddTHHmmssZ")
+    $stdoutPath = Join-Path $manifestDirectory "daily_download.$runStamp.stdout.log"
+    $stderrPath = Join-Path $manifestDirectory "daily_download.$runStamp.stderr.log"
+    $process = Start-Process `
+        -FilePath $pythonPath `
+        -ArgumentList @(
+            ".\scripts\10_download_universe_daily.py",
+            "--workers",
+            "1"
+        ) `
+        -WorkingDirectory $workspacePath `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $stdoutPath `
+        -RedirectStandardError $stderrPath `
+        -PassThru
+    $process.Id | Set-Content -LiteralPath $dailyPidPath -Encoding ascii
+    return $process
+}
+
 try {
     Write-Status "WAITING" "daily" "waiting for complete universe daily download"
+    $staleRestarts = 0
     if (Test-Path -LiteralPath $dailyPidPath) {
-        $dailyPid = [int](Get-Content -LiteralPath $dailyPidPath -Raw)
-        $dailyProcess = Get-Process -Id $dailyPid -ErrorAction SilentlyContinue
-        if ($null -ne $dailyProcess) {
-            Wait-Process -Id $dailyPid
+        while ($true) {
+            $dailyPid = [int](Get-Content -LiteralPath $dailyPidPath -Raw)
+            $dailyProcess = Get-Process -Id $dailyPid -ErrorAction SilentlyContinue
+            if ($null -eq $dailyProcess) {
+                break
+            }
+            if (Test-Path -LiteralPath $dailyManifestPath) {
+                $lastProgress = (Get-Item -LiteralPath $dailyManifestPath).LastWriteTimeUtc
+                $progressAge = [DateTime]::UtcNow - $lastProgress
+                if ($progressAge -ge $staleThreshold) {
+                    if ($staleRestarts -ge $maximumStaleRestarts) {
+                        throw "daily download remained stale after $staleRestarts restarts"
+                    }
+                    $staleRestarts += 1
+                    Write-Status `
+                        "RUNNING" `
+                        "daily_recovery" `
+                        "stale worker pid=$dailyPid; restart $staleRestarts"
+                    Stop-Process -Id $dailyPid -Force
+                    Start-Sleep -Seconds 2
+                    $dailyProcess = Start-DailyRecovery
+                    continue
+                }
+            }
+            Start-Sleep -Seconds $pollSeconds
         }
     }
-    $dailyManifest = Get-Content -LiteralPath (Join-Path $manifestDirectory "daily_download.json") -Raw | ConvertFrom-Json
+    $dailyManifest = Get-Content -LiteralPath $dailyManifestPath -Raw | ConvertFrom-Json
     if ($dailyManifest.status -ne "COMPLETE") {
         throw "daily download ended with status $($dailyManifest.status)"
     }
