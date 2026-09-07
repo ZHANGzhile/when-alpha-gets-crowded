@@ -101,7 +101,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage all
 ```
 
-网络任务和长任务会在 `data/` 下写入原子检查点。Outcome 和模型阶段只有在 `protocol_freeze.json` 有效且其中登记的文件哈希未改变时才运行。
+网络任务和长任务会在 `data/` 下写入原子检查点。后台监督器完成不揭盲的预计算后会进入`WAITING_PROTOCOL_FREEZE`，每分钟检查一次；只有`protocol_freeze.json`有效且其中登记的文件哈希未改变时才继续Outcome和模型阶段。
 
 ## 目录结构
 

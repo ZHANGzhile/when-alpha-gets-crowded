@@ -129,8 +129,10 @@ Run the dependency-ordered pipeline:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_production.ps1 -Stage all
 ```
 
-Network and long-running stages write atomic checkpoints under `data/`. Outcome and model stages
-stop until a valid `protocol_freeze.json` exists and its recorded file hashes still match.
+Network and long-running stages write atomic checkpoints under `data/`. After non-outcome
+precomputation, the background supervisor enters `WAITING_PROTOCOL_FREEZE` and checks once per
+minute. It starts confirmatory outcomes only when `protocol_freeze.json` exists and every recorded
+artifact hash still matches.
 
 ## Repository layout
 

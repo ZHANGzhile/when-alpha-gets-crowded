@@ -144,6 +144,20 @@ try {
     Invoke-PythonStage "continuous_pseudo_crowding" "34_build_continuous_pseudo_crowding.py" @()
     Invoke-PythonStage "continuous_pseudo_state" "35_build_continuous_pseudo_state.py" @()
     Invoke-PythonStage "continuous_pseudo_model_features" "37_build_continuous_pseudo_model_features.py" @()
+    while ($true) {
+        Write-Status `
+            "WAITING_PROTOCOL_FREEZE" `
+            "protocol_freeze" `
+            "pre-outcome artifacts complete; waiting for an intact protocol freeze"
+        & $pythonPath (Join-Path $PSScriptRoot "43_validate_protocol_freeze.py")
+        if ($LASTEXITCODE -eq 0) {
+            break
+        }
+        if ($LASTEXITCODE -ne 3) {
+            throw "protocol freeze validation failed with exit code $LASTEXITCODE"
+        }
+        Start-Sleep -Seconds 60
+    }
     Invoke-PythonStage "dynamic_outcomes" "25_build_dynamic_outcomes.py" @()
     Invoke-PythonStage "fixed_outcomes" "26_build_fixed_outcomes.py" @()
     Invoke-PythonStage "continuous_pseudo_outcomes" "36_build_continuous_pseudo_outcomes.py" @()
